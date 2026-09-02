@@ -368,6 +368,49 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* penanda objek yang keluar batas tanah                              */
+  /*                                                                    */
+  /* Digambar sebagai lapisan terpisah, bukan dengan mengubah warna node */
+  /* aslinya — supaya tidak berebut dengan gaya normal shape saat        */
+  /* di-rebuild, dan warna asli objek tetap kebaca.                      */
+  /* ------------------------------------------------------------------ */
+  var warnShapes = [];
+  var lastWarnIds = '';
+
+  function syncLandWarnings() {
+    var bad = Shapes.outsideLand(Project.shapes);
+
+    // hanya gambar ulang kalau daftarnya benar-benar berubah
+    var key = bad.map(function (b) { return b.id + b.status; }).join(',');
+    var moved = bad.length > 0;   // posisi bisa berubah walau daftarnya sama
+    if (key === lastWarnIds && !moved) return;
+    lastWarnIds = key;
+
+    while (warnShapes.length) warnShapes.pop().destroy();
+
+    for (var i = 0; i < bad.length; i++) {
+      var s = Project.get(bad[i].id);
+      if (!s) continue;
+      var corners = Shapes.footprintCorners(s);
+      var flat = [];
+      for (var k = 0; k < corners.length; k++) flat.push(corners[k][0], corners[k][1]);
+      var ln = new Konva.Line({
+        points: flat,
+        closed: true,
+        stroke: bad[i].status === 'out' ? '#e2564a' : '#e8b84b',
+        strokeWidth: 2,
+        dash: [7, 4],
+        strokeScaleEnabled: false,
+        listening: false
+      });
+      warnShapes.push(ln);
+      overlayLayer.add(ln);
+    }
+    overlayLayer.batchDraw();
+    Project.emit('land-warn', { list: bad });
+  }
+
+  /* ------------------------------------------------------------------ */
   /* rebuild penuh                                                      */
   /* ------------------------------------------------------------------ */
   function rebuild() {
@@ -384,6 +427,7 @@
     }
     shapeLayer.batchDraw();
     syncTransformer();
+    syncLandWarnings();
     overlayLayer.batchDraw();
   }
 
@@ -454,6 +498,7 @@
         n.y(dragStartPos[id].y + dy);
       }
       commitNodes(Object.keys(dragStartPos), true);
+      syncLandWarnings();
       shapeLayer.batchDraw();
       overlayLayer.batchDraw();
     });
@@ -1046,10 +1091,36 @@
       if (draw && draw.dupClick) finishDraw();
     });
 
+    /*
+     * Roda mouse mengikuti kebiasaan Photoshop/Figma:
+     *   roda           -> geser atas-bawah
+     *   Shift + roda   -> geser kiri-kanan
+     *   Ctrl + roda    -> zoom (juga cocok dengan pinch trackpad, yang oleh
+     *                    peramban dikirim sebagai ctrl+wheel)
+     * Menjadikan roda polos sebagai zoom bikin kanvas besar susah dijelajahi —
+     * tiap mau melihat bagian lain harus zoom keluar dulu lalu masuk lagi.
+     */
     stage.on('wheel', function (e) {
       e.evt.preventDefault();
-      var dir = e.evt.deltaY < 0 ? 1 : -1;
-      zoomAt(Units.nextZoom(zoom, dir), stage.getPointerPosition());
+      var ev = e.evt;
+
+      if (ev.ctrlKey || ev.metaKey) {
+        zoomAt(Units.nextZoom(zoom, ev.deltaY < 0 ? 1 : -1), stage.getPointerPosition());
+        return;
+      }
+
+      // deltaMode: 0 = piksel, 1 = baris, 2 = halaman
+      var mult = ev.deltaMode === 1 ? 16 : (ev.deltaMode === 2 ? stage.height() : 1);
+      var dx = ev.deltaX * mult;
+      var dy = ev.deltaY * mult;
+
+      // Sebagian peramban sudah menukar sendiri jadi deltaX saat Shift ditahan;
+      // kalau belum, tukar di sini.
+      if (ev.shiftKey && !ev.deltaX) { dx = dy; dy = 0; }
+
+      stage.position({ x: stage.x() - dx, y: stage.y() - dy });
+      stage.batchDraw();
+      drawGrid();
     });
   }
 
@@ -1135,7 +1206,7 @@
       if (vedit) { if (Project.get(vedit.id)) syncVertexEdit(); else exitVertexEdit(); }
       return;
     }
-    if (info.source === 'editor2d') { refreshLabels(); return; }
+    if (info.source === 'editor2d') { refreshLabels(); syncLandWarnings(); return; }
     var ids = info.ids || [];
     for (var i = 0; i < ids.length; i++) {
       var sh = Project.get(ids[i]);

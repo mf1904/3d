@@ -292,6 +292,11 @@ body[data-view="3d"] #pane-2d{display:none}
 }
 #status .spacer{flex:1 1 auto}
 #status .msg{color:var(--ok)}
+.land-warn-status{
+  color:#e8b84b;background:#2e2417;border:1px solid #5c471f;
+  border-radius:3px;padding:1px 7px;font-size:10.5px;white-space:nowrap;cursor:pointer;
+}
+.land-warn-status:hover{background:#3d3020}
 #status .msg.warn{color:#e8b84b}
 #status .msg.err{color:var(--danger)}
 #status-hint{color:#4d5a6b}

@@ -1374,6 +1374,24 @@
       renderLayers();
     });
     Project.on('history', syncHistoryButtons);
+
+    /* Objek yang keluar batas tanah tidak diblokir — cuma ditandai. Bidang
+     * tanah sering dipakai sebagai acuan sementara, dan menolak penempatan
+     * justru menghalangi saat orang memang sedang menata kasar dulu. */
+    Project.on('land-warn', function (e) {
+      var el = $('status-land');
+      var list = (e && e.list) || [];
+      el.hidden = !list.length;
+      if (!list.length) return;
+      var full = list.filter(function (b) { return b.status === 'out'; }).length;
+      el.textContent = '⚠ ' + list.length + ' objek di luar batas tanah' +
+        (full ? ' (' + full + ' sepenuhnya)' : '');
+      el.title = 'Klik untuk memilih objek yang keluar batas';
+      el.onclick = function () {
+        Project.setSelection(list.map(function (b) { return b.id; }), { raw: true });
+        Editor2D.fit(list.map(function (b) { return b.id; }));
+      };
+    });
     Project.on('zoom', function (e) {
       $('zoom-label').textContent = Math.round(e.zoom * 100) + '%';
     });

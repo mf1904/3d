@@ -765,6 +765,113 @@
     canSetSide:  function (n, idx) { return idx >= 0 && idx < n - 1; },
     canSetAngle: function (n, idx) { return idx >= 1 && idx <= n - 2; },
 
+    /* ------------------------------------------------------------------ */
+    /* validasi batas tanah                                               */
+    /* ------------------------------------------------------------------ */
+
+    /** apakah dua ruas garis berpotongan (tidak termasuk sekadar bersentuhan) */
+    segmentsCross: function (p1, p2, p3, p4) {
+      function cr(o, a, b) {
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      }
+      var d1 = cr(p3, p4, p1), d2 = cr(p3, p4, p2);
+      var d3 = cr(p1, p2, p3), d4 = cr(p1, p2, p4);
+      return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+    },
+
+    /** titik di dalam poligon? (ray casting) */
+    pointInPolygon: function (pt, poly) {
+      var inside = false, n = poly.length;
+      for (var i = 0, j = n - 1; i < n; j = i++) {
+        var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+        if (((yi > pt[1]) !== (yj > pt[1])) &&
+            (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) inside = !inside;
+      }
+      return inside;
+    },
+
+    /** poligon batas sebuah shape 'land' dalam koordinat DUNIA */
+    landPolygon: function (s) {
+      var local = Shapes.polygonLocal(s);
+      var a = (s.rotation || 0) * Math.PI / 180;
+      var c = Math.cos(a), n = Math.sin(a);
+      return local.map(function (p) {
+        return [s.x + (p[0] * c - p[1] * n), s.y + (p[0] * n + p[1] * c)];
+      });
+    },
+
+    /** empat sudut kotak pembatas denah sebuah shape, koordinat DUNIA */
+    footprintCorners: function (s) {
+      var e = Shapes.planExtents(s);
+      var o = Shapes.planOffset(s);
+      var cx = s.x + o.x, cy = s.y + o.y;
+      var a = (s.rotation || 0) * Math.PI / 180;
+      var c = Math.cos(a), n = Math.sin(a);
+      return [[-e.ex, -e.ez], [e.ex, -e.ez], [e.ex, e.ez], [-e.ex, e.ez]]
+        .map(function (p) {
+          return [cx + (p[0] * c - p[1] * n), cy + (p[0] * n + p[1] * c)];
+        });
+    },
+
+    /**
+     * Posisi sebuah shape terhadap kumpulan bidang tanah.
+     *
+     * Cek sudut saja tidak cukup: pada tanah yang cekung, keempat sudut bisa
+     * berada di dalam sementara sisinya tetap memotong batas. Jadi perpotongan
+     * sisi ikut diperiksa.
+     *
+     * @returns 'in' | 'partial' | 'out'
+     */
+    landStatus: function (shape, polys) {
+      if (!polys || !polys.length) return 'in';
+      var corners = Shapes.footprintCorners(shape);
+
+      for (var k = 0; k < polys.length; k++) {
+        var poly = polys[k];
+        var inCount = 0, i, j;
+        for (i = 0; i < corners.length; i++) {
+          if (Shapes.pointInPolygon(corners[i], poly)) inCount++;
+        }
+
+        var crosses = false;
+        for (i = 0; i < corners.length && !crosses; i++) {
+          var a1 = corners[i], a2 = corners[(i + 1) % corners.length];
+          for (j = 0; j < poly.length; j++) {
+            if (Shapes.segmentsCross(a1, a2, poly[j], poly[(j + 1) % poly.length])) {
+              crosses = true;
+              break;
+            }
+          }
+        }
+
+        if (inCount === corners.length && !crosses) return 'in';
+        if (inCount > 0 || crosses) return 'partial';
+      }
+      return 'out';
+    },
+
+    /**
+     * Objek mana saja yang keluar dari batas tanah.
+     * Bidang tanah, objek tersembunyi, dan objek tanpa luasan diabaikan.
+     * @returns [{id, status}] — kosong berarti semuanya di dalam
+     */
+    outsideLand: function (shapes) {
+      var polys = shapes
+        .filter(function (s) { return Shapes.isLand(s.type) && Shapes.isVisible(s); })
+        .map(Shapes.landPolygon)
+        .filter(function (p) { return p.length >= 3; });
+      if (!polys.length) return [];
+
+      var out = [];
+      for (var i = 0; i < shapes.length; i++) {
+        var s = shapes[i];
+        if (Shapes.isLand(s.type) || !Shapes.isVisible(s)) continue;
+        var st = Shapes.landStatus(s, polys);
+        if (st !== 'in') out.push({ id: s.id, status: st });
+      }
+      return out;
+    },
+
     /**
      * Coba perbaiki poligon yang sisinya saling menyilang, dengan mengurutkan
      * ulang titik berdasarkan sudut polar terhadap titik pusatnya (asumsi

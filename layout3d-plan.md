@@ -368,8 +368,16 @@ ujung rantai tidak bisa disetel** (nilainya ditentukan sisi lain). Di UI
 keduanya ditampilkan tapi dikunci, lengkap dengan penjelasan di tooltip —
 bukan disembunyikan, supaya angkanya tetap kebaca.
 
-Yang memang ditandai v2 di rencana dan belum dikerjakan: validasi visual kalau
-ada bangunan keluar dari boundary tanah.
+Butir v2 (validasi bangunan keluar boundary) ikut dikerjakan: ditandai garis
+putus-putus oranye/merah di kanvas + hitungan di status bar yang bisa diklik.
+Sengaja hanya menandai, tidak memblokir — bidang tanah sering dipakai sebagai
+acuan sementara. Deteksinya tidak cuma cek sudut, tapi juga perpotongan sisi,
+karena pada tanah cekung keempat sudut bisa di dalam sementara sisinya memotong
+batas.
+
+Sekalian diperbaiki: roda mouse dulu dipetakan ke zoom, sekarang ke geser
+(Shift = mendatar, Ctrl = zoom) mengikuti Photoshop — roda-sebagai-zoom bikin
+kanvas besar susah dijelajah.
 
 ### Poin 8 — Design challenge: BELUM dimulai
 

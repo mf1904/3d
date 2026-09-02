@@ -232,6 +232,37 @@ lain. Memaksa mengubahnya akan merusak angka yang sudah benar — pada sudut
 ujung, memutar rantai justru menggerakkan kedua sisinya bersamaan sehingga
 sudutnya tidak berubah sama sekali.
 
+### Validasi batas
+
+Objek yang keluar dari bidang tanah ditandai otomatis: garis putus-putus
+**oranye** kalau menumpang batas, **merah** kalau seluruhnya di luar. Status bar
+menampilkan jumlahnya — klik untuk langsung memilih objek yang bermasalah.
+
+Sekadar ditandai, **tidak diblokir**. Bidang tanah sering dipakai sebagai acuan
+sementara, dan menolak penempatan justru menghalangi saat orang memang sedang
+menata kasar dulu.
+
+Cek sudut saja tidak cukup: pada tanah cekung, keempat sudut sebuah bangunan
+bisa berada di dalam sementara sisinya tetap memotong batas. Jadi perpotongan
+sisi ikut diperiksa.
+
+---
+
+## Navigasi kanvas 2D
+
+Mengikuti kebiasaan Photoshop/Figma:
+
+| Aksi | Hasil |
+|---|---|
+| roda mouse | geser atas–bawah |
+| `Shift` + roda | geser kiri–kanan |
+| `Ctrl` + roda | zoom (juga cocok dengan pinch trackpad) |
+| Spasi + drag, drag kanan/tengah | geser bebas |
+| tombol `+` / `−` / `Fit` di toolbar | zoom bertahap |
+
+Roda polos sengaja **bukan** zoom: di kanvas besar itu bikin susah menjelajah —
+tiap mau melihat bagian lain harus zoom keluar dulu lalu masuk lagi.
+
 ---
 
 ## Sembunyikan objek

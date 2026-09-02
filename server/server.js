@@ -29,11 +29,32 @@ app.use(express.json({ limit: MAX_BODY }));
 
 /* ----------------------------------------------------------- statis ----- */
 
-const STATIC_OPTS = { maxAge: '1h', index: false, dotfiles: 'ignore' };
+/*
+ * CSS & JS TIDAK boleh di-cache lama.
+ *
+ * Pernah kejadian: index.html sudah versi baru tapi peramban masih memakai
+ * js/shapes.js lama dari cache satu jam — HTML baru ketemu JS lama, dan
+ * fiturnya mati diam-diam. Yang deploy tidak sadar karena di komputernya
+ * cache-nya kosong.
+ *
+ * "no-cache" bukan berarti tidak disimpan: peramban tetap menyimpan, hanya
+ * wajib bertanya dulu apakah sudah berubah. Kalau belum, jawabannya 304 tanpa
+ * isi. Berkasnya kecil, jadi ongkosnya hampir nol sementara perbaikan langsung
+ * sampai ke pengguna.
+ */
+const STATIC_OPTS = {
+  index: false,
+  dotfiles: 'ignore',
+  etag: true,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+};
 for (const dir of ['css', 'js', 'vendor']) {
   app.use('/' + dir, express.static(path.join(APP_DIR, dir), STATIC_OPTS));
 }
-app.get('/', (req, res) => res.sendFile(path.join(APP_DIR, 'index.html')));
+app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(APP_DIR, 'index.html'));
+});
 
 /* -------------------------------------------------------------- auth ---- */
 

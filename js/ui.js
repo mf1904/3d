@@ -1590,6 +1590,32 @@
     });
     Project.on('history', syncHistoryButtons);
 
+    /* Indikator autosave. Kegagalan (biasanya kuota localStorage penuh) wajib
+     * kelihatan: tanpa ini user mengira kerjaannya aman padahal sejak tadi
+     * tidak ada yang tersimpan. */
+    var saveTimer = null;
+    Project.on('autosave', function (e) {
+      var el = $('status-save');
+      if (e.ok) {
+        el.className = 'save-state ok';
+        el.textContent = '✓ tersimpan';
+        el.title = 'Tersimpan otomatis di browser ini';
+        el.onclick = null;
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () {
+          el.className = 'save-state';
+          el.textContent = 'tersimpan otomatis';
+        }, 2000);
+      } else {
+        if (saveTimer) clearTimeout(saveTimer);
+        el.className = 'save-state bad';
+        el.textContent = '⚠ GAGAL disimpan — klik untuk Export JSON';
+        el.title = 'Penyimpanan browser penuh atau diblokir. Kerjaanmu TIDAK ' +
+                   'tersimpan otomatis. Export JSON sekarang supaya tidak hilang.';
+        el.onclick = function () { $('btn-export-json').click(); };
+      }
+    });
+
     /* Objek yang keluar batas tanah tidak diblokir — cuma ditandai. Bidang
      * tanah sering dipakai sebagai acuan sementara, dan menolak penempatan
      * justru menghalangi saat orang memang sedang menata kasar dulu. */

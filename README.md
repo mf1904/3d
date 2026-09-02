@@ -552,7 +552,7 @@ Tiga lokasi, dan aplikasi selalu jalan walau cuma punya yang pertama:
 
 | Lokasi | Kapan dipakai |
 |---|---|
-| **Browser ini** (localStorage) | selalu aktif; ada autosave otomatis supaya kerjaan tidak hilang saat tab tertutup |
+| **Browser ini** (localStorage) | selalu aktif; autosave otomatis (lihat di bawah) |
 | **Server** | kalau backend dipasang & sudah login — bisa dibuka dari komputer mana pun |
 | **File `.json`** | Export/Import, untuk backup dan pindah komputer tanpa server |
 
@@ -563,6 +563,26 @@ Tombol **Simpan** dan **Buka** menampilkan pilihan lokasi *hanya* kalau backend
 terdeteksi. Deteksinya otomatis lewat `GET api/me` saat aplikasi mulai — kalau
 gagal, seluruh tombol server disembunyikan dan aplikasi tetap berfungsi penuh.
 Artinya kode yang sama bisa di-deploy sebagai file statis murni.
+
+### Autosave
+
+Setiap perubahan ditulis otomatis ke localStorage, ditunda 600 ms supaya
+mengetik atau menyeret tidak memicu ratusan penulisan. Saat halaman ditutup,
+di-refresh, atau tabnya disembunyikan, tunggakan itu **ditulis paksa** lewat
+`pagehide`/`visibilitychange` — tanpa itu, perubahan dalam 600 ms terakhir
+hilang persis saat paling baru dan paling mudah terlupa.
+
+Status di kanan bawah menunjukkan keadaannya. Kalau penyimpanan browser penuh
+atau diblokir, indikatornya berubah merah **⚠ GAGAL disimpan** dan bisa diklik
+untuk langsung Export JSON. Ini penting: tanpa peringatan itu, kegagalan
+autosave hanya jadi baris di console dan user mengira kerjaannya aman padahal
+sejak tadi tidak ada yang tersimpan.
+
+Yang perlu diingat: autosave hanya menyimpan **satu** project terakhir, di
+**browser itu saja**. Untuk menyimpan banyak project atau membukanya dari
+komputer lain, pakai **Simpan** (browser/server) atau **Export JSON**.
+
+---
 
 Backend-nya Express + penyimpanan file JSON, **tanpa dependensi native** —
 `npm install` tidak perlu toolchain build di VPS.

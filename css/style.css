@@ -313,6 +313,12 @@ body[data-view="3d"] #pane-2d{display:none}
 }
 #status .spacer{flex:1 1 auto}
 #status .msg{color:var(--ok)}
+.save-state{font-size:10.5px;color:#4d5a6b;white-space:nowrap}
+.save-state.ok{color:var(--ok)}
+.save-state.bad{
+  color:#fff;background:var(--danger);border-radius:3px;padding:1px 7px;
+  cursor:pointer;font-weight:600;
+}
 .land-warn-status{
   color:#e8b84b;background:#2e2417;border:1px solid #5c471f;
   border-radius:3px;padding:1px 7px;font-size:10.5px;white-space:nowrap;cursor:pointer;

@@ -417,13 +417,54 @@
 
   /* --- localStorage --- */
   var autosaveTimer = null;
+  var autosaveBroken = false;
+
+  /** tulis sekarang juga; mengembalikan true kalau berhasil */
+  function writeAutosave() {
+    try {
+      localStorage.setItem(KEY_AUTOSAVE, JSON.stringify(state));
+      autosaveBroken = false;
+      emit('autosave', { ok: true, at: Date.now() });
+      return true;
+    } catch (e) {
+      // Paling sering: kuota localStorage penuh. Ini HARUS sampai ke user —
+      // kalau cuma jadi warning di console, dia akan mengira kerjaannya aman
+      // padahal sejak tadi tidak ada yang tersimpan.
+      autosaveBroken = true;
+      console.warn('[layout3d] autosave gagal:', e);
+      emit('autosave', { ok: false, error: e });
+      return false;
+    }
+  }
+
   function scheduleAutosave() {
     if (autosaveTimer) clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(function () {
       autosaveTimer = null;
-      try { localStorage.setItem(KEY_AUTOSAVE, JSON.stringify(state)); }
-      catch (e) { console.warn('[layout3d] autosave gagal:', e); }
+      writeAutosave();
     }, 600);
+  }
+
+  /**
+   * Tulis tunggakan autosave segera. Dipanggil saat halaman mau ditutup /
+   * disembunyikan: tanpa ini, perubahan dalam 600 ms terakhir hilang begitu
+   * user menekan refresh — persis saat perubahan itu paling baru dan paling
+   * mudah terlupa.
+   */
+  function flushAutosave() {
+    if (!autosaveTimer) return true;      // tidak ada tunggakan
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+    return writeAutosave();
+  }
+
+  if (typeof window !== 'undefined') {
+    // pagehide lebih bisa diandalkan daripada beforeunload (terutama di
+    // ponsel, di mana tab bisa dimatikan tanpa beforeunload sama sekali)
+    window.addEventListener('pagehide', flushAutosave);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushAutosave();
+    });
   }
 
   function restoreAutosave() {
@@ -493,6 +534,8 @@
     canRedo: function () { return redoStack.length > 0; },
     serialize: serialize, load: load, reset: reset, sanitize: sanitize,
     restoreAutosave: restoreAutosave,
+    flushAutosave: flushAutosave,
+    autosaveBroken: function () { return autosaveBroken; },
     listSaved: listSaved, saveNamed: saveNamed, loadNamed: loadNamed, deleteNamed: deleteNamed
   };
 })(window);

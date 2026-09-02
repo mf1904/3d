@@ -279,6 +279,32 @@ Mengikuti kebiasaan Photoshop/Figma:
 Roda polos sengaja **bukan** zoom: di kanvas besar itu bikin susah menjelajah —
 tiap mau melihat bagian lain harus zoom keluar dulu lalu masuk lagi.
 
+### Panel 3D
+
+Kendali roda sama persis dengan 2D:
+
+| Aksi | Hasil |
+|---|---|
+| roda mouse | geser atas–bawah |
+| `Shift` + roda | geser kiri–kanan |
+| `Ctrl` + roda | zoom **ke titik yang ditunjuk kursor** |
+| drag | putar (orbit) |
+| `Shift`/kanan/tengah + drag | geser |
+
+Zoom-nya menuju titik di bawah kursor, bukan ke pusat orbit. Ini yang bikin
+memperbesar sudut tertentu jadi mungkin: sebelumnya makin dekat, bagian yang
+mau dilihat justru makin keluar layar dan harus dikejar dengan geser manual.
+
+Caranya: posisi kamera **dan** titik orbit diskalakan terhadap titik di bawah
+kursor. Karena keduanya diskalakan dengan faktor sama, arah pandang tidak
+berubah — hanya jaraknya — sehingga titik acuan tetap terproyeksi di piksel
+yang sama. Kalau kursor di ruang kosong, acuannya jatuh ke bidang mendatar
+setinggi titik orbit.
+
+Catatan arah: menggulir roda dan menyeret dengan tombol tengah bergerak
+berlawanan — menggulir itu menggeser *pandangan*, menyeret itu menggenggam
+*pemandangannya*. Sama seperti kebanyakan aplikasi.
+
 ---
 
 ## Sembunyikan objek

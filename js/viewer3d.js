@@ -290,6 +290,66 @@
     needsRender = true;
   }
 
+  /** sumbu kanan & atas layar dalam koordinat dunia, untuk menggeser target */
+  function screenAxes() {
+    return {
+      right: new THREE.Vector3(Math.cos(ctrl.theta), 0, -Math.sin(ctrl.theta)),
+      up: new THREE.Vector3(0, 1, 0)
+        .multiplyScalar(Math.sin(ctrl.phi))
+        .addScaledVector(
+          new THREE.Vector3(Math.sin(ctrl.theta), 0, Math.cos(ctrl.theta)),
+          -Math.cos(ctrl.phi))
+    };
+  }
+
+  /**
+   * Titik dunia yang sedang ditunjuk kursor: kena objek kalau ada, kalau
+   * tidak jatuh ke bidang mendatar setinggi titik orbit. Bidang cadangan itu
+   * penting — tanpanya, zoom di area kosong (yang justru sering dipakai saat
+   * mengatur pandangan) tidak punya acuan sama sekali.
+   */
+  function pointUnderCursor(e) {
+    var r = canvas.getBoundingClientRect();
+    pointerVec.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    pointerVec.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    raycaster.setFromCamera(pointerVec, camera);
+
+    var vis = root.children.filter(function (m) { return m.visible; });
+    var hits = raycaster.intersectObjects(vis, false);
+    if (hits.length) return hits[0].point.clone();
+
+    var plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -ctrl.target.y);
+    var pt = new THREE.Vector3();
+    // ray sejajar bidang (pandangan mendatar) -> tidak ada perpotongan
+    return raycaster.ray.intersectPlane(plane, pt) ? pt : null;
+  }
+
+  /**
+   * Zoom dengan faktor k sambil menahan titik di bawah kursor tetap di
+   * tempatnya pada layar.
+   *
+   * Caranya: skalakan posisi kamera DAN titik orbit terhadap titik itu.
+   * Karena keduanya diskalakan dengan faktor sama, arah pandang tidak
+   * berubah — hanya jaraknya — sehingga titik acuan tetap terproyeksi di
+   * piksel yang sama.
+   */
+  function zoomAtCursor(e, k) {
+    var newR = Math.max(ctrl.minRadius, Math.min(ctrl.maxRadius, ctrl.radius * k));
+    var kk = newR / ctrl.radius;          // faktor efektif setelah dijepit batas
+    if (Math.abs(kk - 1) < 1e-9) return;
+
+    var p = pointUnderCursor(e);
+    if (p) {
+      ctrl.target.set(
+        p.x + (ctrl.target.x - p.x) * kk,
+        p.y + (ctrl.target.y - p.y) * kk,
+        p.z + (ctrl.target.z - p.z) * kk
+      );
+    }
+    ctrl.radius = newR;
+    applyCamera();
+  }
+
   function wireControls() {
     canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
@@ -310,13 +370,12 @@
         ctrl.theta -= dx * 0.006;
         ctrl.phi -= dy * 0.006;
       } else {
+        // menyeret = menggenggam pemandangan: isi layar ikut arah kursor,
+        // jadi tandanya kebalikan dari menggulir roda
         var panScale = ctrl.radius * 0.0016;
-        var right = new THREE.Vector3(Math.cos(ctrl.theta), 0, -Math.sin(ctrl.theta));
-        var up = new THREE.Vector3(0, 1, 0)
-          .multiplyScalar(Math.sin(ctrl.phi))
-          .addScaledVector(new THREE.Vector3(Math.sin(ctrl.theta), 0, Math.cos(ctrl.theta)), -Math.cos(ctrl.phi));
-        ctrl.target.addScaledVector(right, -dx * panScale);
-        ctrl.target.addScaledVector(up, dy * panScale);
+        var v = screenAxes();
+        ctrl.target.addScaledVector(v.right, -dx * panScale);
+        ctrl.target.addScaledVector(v.up, dy * panScale);
       }
       applyCamera();
     });
@@ -326,10 +385,36 @@
       ctrl.dragging = null;
     });
 
+    /*
+     * Roda mouse disamakan dengan kanvas 2D:
+     *   roda           -> geser atas-bawah
+     *   Shift + roda   -> geser kiri-kanan
+     *   Ctrl + roda    -> zoom, MENUJU TITIK DI BAWAH KURSOR
+     *
+     * Yang terakhir itu intinya. Sebelumnya zoom selalu mendekat ke titik
+     * pusat orbit, jadi memperbesar sudut tertentu mustahil: makin dekat,
+     * yang mau dilihat justru makin keluar layar dan harus dikejar dengan
+     * geser manual.
+     */
     canvas.addEventListener('wheel', function (e) {
       e.preventDefault();
-      var k = e.deltaY > 0 ? 1.14 : 1 / 1.14;
-      ctrl.radius = Math.max(ctrl.minRadius, Math.min(ctrl.maxRadius, ctrl.radius * k));
+      var mult = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? canvas.clientHeight : 1);
+
+      if (e.ctrlKey || e.metaKey) {
+        zoomAtCursor(e, e.deltaY > 0 ? 1.14 : 1 / 1.14);
+        return;
+      }
+
+      var dx = e.deltaX * mult;
+      var dy = e.deltaY * mult;
+      if (e.shiftKey && !e.deltaX) { dx = dy; dy = 0; }
+
+      var panScale = ctrl.radius * 0.0016;
+      var v = screenAxes();
+      // arah roda: gulir ke bawah = pandangan turun (isi layar naik),
+      // sama seperti menggulir halaman — kebalikan dari menyeret dengan tangan
+      ctrl.target.addScaledVector(v.right, dx * panScale);
+      ctrl.target.addScaledVector(v.up, -dy * panScale);
       applyCamera();
     }, { passive: false });
   }
@@ -427,6 +512,25 @@
     rebuild: rebuild,
     fit: fit,
     exportables: exportables,
-    invalidate: function () { needsRender = true; }
+    invalidate: function () { needsRender = true; },
+
+    /** keadaan kamera orbit — untuk debug & pengujian */
+    cameraState: function () {
+      return {
+        target: ctrl.target.clone(),
+        radius: ctrl.radius, theta: ctrl.theta, phi: ctrl.phi,
+        position: camera.position.clone()
+      };
+    },
+
+    /** proyeksikan titik dunia ke piksel kanvas — untuk memastikan titik yang
+     *  ditunjuk kursor benar-benar diam di layar saat di-zoom */
+    project: function (v) {
+      var p = v.clone().project(camera);
+      return {
+        x: (p.x + 1) / 2 * canvas.clientWidth,
+        y: (-p.y + 1) / 2 * canvas.clientHeight
+      };
+    }
   };
 })(window);

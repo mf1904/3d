@@ -307,7 +307,7 @@
   var labelGroup = null;
 
   function makeLabelSprite(text, accent) {
-    var pad = 18, fs = 46;
+    var pad = 14, fs = 44;
     var c = document.createElement('canvas');
     var ctx = c.getContext('2d');
     ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
@@ -341,13 +341,41 @@
     return sp;
   }
 
-  /** ukuran label dibuat mengikuti jarak kamera supaya terlihat tetap */
+  var LABEL_PX = 15;        // tinggi label di layar, piksel
+  var LABEL_MIN_OBJ_PX = 46; // objek lebih kecil dari ini: labelnya disembunyikan
+
+  /**
+   * Ukuran label dipatok dalam PIKSEL LAYAR, bukan meter.
+   *
+   * Untuk kamera perspektif, benda setinggi `H` di jarak `d` tampil setinggi
+   *   H · tinggiViewport / (2 · d · tan(fov/2))  piksel.
+   * Dibalik: untuk mendapat tinggi piksel tetap, tinggi dunianya harus
+   * sebanding dengan jaraknya. Jaraknya dihitung per label, bukan dari radius
+   * orbit — label yang jauh dari titik pusat pandangan akan salah ukuran
+   * kalau memakai satu angka untuk semuanya.
+   *
+   * Label juga disembunyikan saat objeknya sendiri sudah terlalu kecil di
+   * layar, meniru denah 2D: zoom keluar jadi bersih, zoom masuk baru
+   * namanya muncul.
+   */
   function scaleLabels() {
-    if (!labelGroup) return;
-    var hWorld = ctrl.radius * 0.035;
+    if (!labelGroup || !labelGroup.children.length) return;
+    var vh = canvas.clientHeight || 600;
+    var tanHalf = Math.tan(camera.fov * Math.PI / 360);
+    var perPx = 2 * tanHalf / vh;      // ukuran dunia per piksel, per satuan jarak
+
     for (var i = 0; i < labelGroup.children.length; i++) {
       var sp = labelGroup.children[i];
-      sp.scale.set(hWorld * sp.userData.aspect, hWorld, 1);
+      sp.position.y = sp.userData.baseY;   // ukur dari puncak objek (tetap), bukan posisi sprite yang sudah digeser
+      var d = camera.position.distanceTo(sp.position) || 1e-6;
+      var worldH = LABEL_PX * perPx * d;
+
+      sp.scale.set(worldH * sp.userData.aspect, worldH, 1);
+      // duduk tepat di atas objeknya, jaraknya ikut ukuran label
+      sp.position.y = sp.userData.baseY + worldH * 0.75;
+
+      var objPx = sp.userData.objSize / (perPx * d);
+      sp.visible = objPx > LABEL_MIN_OBJ_PX;
     }
   }
 
@@ -387,7 +415,8 @@
       var top = m((s.elevation || 0) + e.cy + e.ey);
       var o = Shapes.planOffset(s);
       addLabel(s.meta.label || Shapes.name(s.type),
-               m(s.x + o.x), top, m(s.y + o.y), false);
+               m(s.x + o.x), top, m(s.y + o.y), false,
+               m(Math.max(e.ex, e.ez) * 2));
     }
 
     for (var gid in groups) {
@@ -398,16 +427,18 @@
         var sh = Project.get(id), ex = Shapes.planExtents(sh);
         return (sh.elevation || 0) + ex.cy + ex.ey;
       }));
-      addLabel(info.name, m(b.cx), m(topG), m(b.cy), true);
+      addLabel(info.name, m(b.cx), m(topG), m(b.cy), true, m(Math.max(b.w, b.h)));
     }
 
     scaleLabels();
     needsRender = true;
   }
 
-  function addLabel(text, x, y, z, accent) {
+  function addLabel(text, x, y, z, accent, objSize) {
     var sp = makeLabelSprite(String(text).slice(0, 40), accent);
-    sp.position.set(x, y + ctrl.radius * 0.03, z);
+    sp.position.set(x, y, z);
+    sp.userData.baseY = y;                       // puncak objek
+    sp.userData.objSize = Math.max(objSize || 0, 1e-3);
     labelGroup.add(sp);
   }
 
@@ -632,6 +663,21 @@
     resize: resize,
     rebuild: rebuild,
     rebuildLabels: rebuildLabels,
+
+    /** ringkasan label 3D — untuk debug & pengujian */
+    labelInfo: function () {
+      if (!labelGroup) return [];
+      return labelGroup.children.map(function (sp) {
+        return {
+          pos: sp.position.clone(),
+          scaleY: sp.scale.y,
+          scaleX: sp.scale.x,
+          visible: sp.visible,
+          baseY: sp.userData.baseY,
+          objSize: sp.userData.objSize
+        };
+      });
+    },
     fit: fit,
     exportables: exportables,
     invalidate: function () { needsRender = true; },

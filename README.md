@@ -309,10 +309,17 @@ berlawanan — menggulir itu menggeser *pandangan*, menyeret itu menggenggam
 
 ## Nama & label
 
-Nama objek tampil di **denah 2D** dan di **panel 3D** (label 3D berupa billboard
-yang selalu menghadap kamera; ukurannya mengikuti jarak kamera supaya tetap
-terbaca di rumah 10 m maupun pabrik 80 m). Bisa dimatikan lewat centang
-**Nama 3D** di toolbar.
+Nama objek tampil di **denah 2D** dan di **panel 3D**. Label 3D berupa billboard
+yang selalu menghadap kamera dan dijaga **tetap 15 piksel** di layar, persis
+seperti label 2D: mendekat atau menjauh, tingginya tidak berubah — jadi label
+tidak pernah membesar menutupi model. Posisinya menempel tepat di atas puncak
+objeknya. Ukuran fisik tidak ditampilkan, hanya nama.
+
+Supaya tampilan tidak penuh saat melihat keseluruhan site, label **hilang
+sendiri** ketika objeknya tampak lebih kecil dari 46 piksel di layar, dan
+**muncul lagi** begitu di-zoom mendekat. Jadi zoom-out = bersih, zoom-in =
+detail namanya terbaca. Semuanya bisa dimatikan lewat centang **Nama 3D** di
+toolbar.
 
 ### Nama grup
 

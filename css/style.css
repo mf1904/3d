@@ -111,8 +111,19 @@ select:disabled{opacity:.4}
 .panel-body::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
 #shape-library{flex:1 1 auto;min-height:120px}
 #preset-list{flex:0 0 auto;max-height:190px}
-#props{flex:1 1 auto;min-height:150px}
-#layer-list{flex:1 1 auto;min-height:100px;padding:4px}
+/* Properti vs Objek: tingginya bisa digeser. Saat objek makin banyak,
+   daftar Objek memanjang dan panel Properti tergencet — user yang paling
+   tahu mana yang sedang dia butuhkan, jadi biarkan dia yang mengatur. */
+#props{flex:0 0 var(--rsplit,52%);min-height:70px}
+#layer-list{flex:1 1 auto;min-height:70px;padding:4px}
+#rsplit{
+  flex:0 0 7px;cursor:row-resize;background:var(--bg-2);user-select:none;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+}
+#rsplit .grip{width:34px;height:3px;border-radius:2px;background:var(--line-2);pointer-events:none}
+#rsplit:hover,#rsplit.dragging{background:var(--accent-2);border-color:var(--accent)}
+#rsplit:hover .grip,#rsplit.dragging .grip{background:#fff}
 .panel-hint{
   flex:0 0 auto;padding:8px 10px;font-size:11px;color:var(--fg-mute);
   border-top:1px solid var(--line);line-height:1.5;
@@ -190,6 +201,16 @@ body[data-view="3d"] #pane-2d{display:none}
   font-variant-numeric:tabular-nums;
 }
 #props-form input:focus{outline:none;border-color:var(--accent)}
+/* form grup dibangun lewat innerHTML di #props-multi, jadi butuh gaya sendiri */
+#props-multi{text-align:left}
+#props-multi .row,#props-multi .row2{margin-bottom:7px}
+#props-multi label{display:block;font-size:10.5px;color:var(--fg-mute);margin-bottom:2px;letter-spacing:.3px}
+#props-multi input[type=number]{
+  width:100%;background:var(--bg-3);border:1px solid var(--line);color:var(--fg);
+  border-radius:4px;padding:5px 7px;font-size:12px;font-family:inherit;
+  font-variant-numeric:tabular-nums;
+}
+#props-multi input[type=number]:focus{outline:none;border-color:var(--accent)}
 #props-form input[readonly]{color:var(--fg-mute);background:var(--bg)}
 #props-form input[type=color]{
   width:100%;height:26px;padding:2px;background:var(--bg-3);

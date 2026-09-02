@@ -160,6 +160,11 @@
     var sel = Project.selectedShapes();
     var form = $('props-form'), empty = $('props-empty'), multi = $('props-multi');
 
+    // isi panel grup dikosongkan saat tidak dipakai: kalau dibiarkan, id
+    // seperti #g-x tetap ada di DOM walau tersembunyi, dan kode lain bisa
+    // salah kira grup sedang aktif
+    if (sel.length < 2) multi.innerHTML = '';
+
     if (!sel.length) {
       form.hidden = true; empty.hidden = false; multi.hidden = true;
       return;
@@ -189,6 +194,7 @@
         '</div>' +
         '<div class="grp-tip">Tidurkan Grup memutar grup sebagai satu kesatuan (posisi &amp; kemiringan tiap ' +
         'bagian ikut berubah, susunan relatifnya terjaga) &mdash; bukan cuma memiringkan tiap bagian di tempat.</div>' +
+        groupFormHtml(sel) +
         '<div class="sep">Pilih satu untuk diedit</div>' +
         '<div class="grp-list">' +
           sel.map(function (s) {
@@ -207,6 +213,7 @@
           Project.setSelection([b.getAttribute('data-pick')], { raw: true });
         };
       });
+      bindGroupForm();
       $('btn-group').onclick = doGroup;
       $('btn-ungroup-multi').onclick = doUngroup;
       $('btn-multi-del').onclick = function () { Project.remove(Project.selection); };
@@ -478,10 +485,12 @@
     var shift = oldBottom - newBottom;
 
     var patchList = list.map(function (item) {
+      // pembulatan halus: rotasi rigid tidak boleh menggeser susunan antar
+      // anggota, dan kesalahannya menumpuk kalau grup diputar berulang
       return { id: item.id, patch: {
-        x: Units.round(item.patch.x, u),
-        y: Units.round(item.patch.y, u),
-        elevation: Units.round(item.patch.elevation + shift, u),
+        x: Units.roundFine(item.patch.x, u),
+        y: Units.roundFine(item.patch.y, u),
+        elevation: Units.roundFine(item.patch.elevation + shift, u),
         rotation: Math.round(item.patch.rotation * 100) / 100,
         tiltX: Math.round(item.patch.tiltX * 100) / 100,
         tiltZ: Math.round(item.patch.tiltZ * 100) / 100
@@ -515,6 +524,155 @@
     var delta = Shapes.mat3Mul(target, Shapes.mat3Transpose(cur));
     applyGroupRigid(shapes, delta);
     say('Grup ditegakkan kembali — susunan antar anggota tetap terjaga.');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* properti grup: X/Y, rotasi, kemiringan, elevasi, ukuran            */
+  /*                                                                    */
+  /* Semua bekerja pada grup sebagai SATU benda: menggeser memindahkan   */
+  /* semua anggota, memutar memutar rigid terhadap pusat, dan mengubah   */
+  /* ukuran menskalakan proporsional — posisi maupun dimensi tiap        */
+  /* anggota — sehingga susunan relatifnya tidak pernah berubah.         */
+  /* ------------------------------------------------------------------ */
+
+  /** form properti grup — sama susunannya dengan panel objek tunggal */
+  function groupFormHtml(shapes) {
+    var u = Project.unit();
+    var tag = Units.def(u).label;
+    var g = groupBox(shapes);
+    var ref = shapes[0];
+    var f = function (v) { return Units.round(v, u); };
+    var deg = function (v) { return Math.round((v || 0) * 100) / 100; };
+
+    return '<div class="sep">Posisi &amp; Rotasi (grup) <span class="unit-tag">' + tag + '</span></div>' +
+      '<div class="row2">' +
+        '<div><label>X</label><input type="number" step="any" id="g-x" value="' + f(g.cx) + '"></div>' +
+        '<div><label>Y</label><input type="number" step="any" id="g-y" value="' + f(g.cy) + '"></div>' +
+      '</div>' +
+      '<div class="row"><label>Rotasi denah / yaw (°)</label>' +
+        '<input type="number" step="any" id="g-rot" value="' + deg(ref.rotation) + '"></div>' +
+      '<div class="row2">' +
+        '<div><label>Miring X (°)</label><input type="number" step="any" id="g-tiltx" value="' + deg(ref.tiltX) + '"></div>' +
+        '<div><label>Miring Z (°)</label><input type="number" step="any" id="g-tiltz" value="' + deg(ref.tiltZ) + '"></div>' +
+      '</div>' +
+      '<div class="sep">Ukuran grup <span class="unit-tag">' + tag + '</span></div>' +
+      '<div class="row2">' +
+        '<div><label>Lebar (X)</label><input type="number" step="any" min="0" id="g-w" value="' + f(g.w) + '"></div>' +
+        '<div><label>Dalam (Y)</label><input type="number" step="any" min="0" id="g-d" value="' + f(g.d) + '"></div>' +
+      '</div>' +
+      '<div class="row2">' +
+        '<div><label>Tinggi</label><input type="number" step="any" min="0" id="g-h" value="' + f(g.height) + '"></div>' +
+        '<div><label>Elevasi dasar</label><input type="number" step="any" id="g-elev" value="' + f(g.bottom) + '"></div>' +
+      '</div>' +
+      '<div class="grp-tip">Ukuran diskalakan <b>proporsional</b> — mengubah satu ' +
+      'ikut mengubah dua lainnya, supaya anggota yang diputar miring tidak gepeng. ' +
+      'Rotasi &amp; kemiringan diputar rigid terhadap pusat grup.</div>';
+  }
+
+  /** pasang handler untuk form properti grup */
+  function bindGroupForm() {
+    var ids = ['g-x', 'g-y', 'g-rot', 'g-tiltx', 'g-tiltz', 'g-w', 'g-d', 'g-h', 'g-elev'];
+    ids.forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.addEventListener('focus', function () {
+        el.dataset.before = JSON.stringify(Project.serialize());
+      });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      });
+      el.addEventListener('change', function () { applyGroupField(id, el); });
+    });
+  }
+
+  function applyGroupField(id, el) {
+    var shapes = Project.selectedShapes();
+    if (shapes.length < 2) return;
+    var v = parseFloat(el.value);
+    if (!isFinite(v)) { renderProps(); return; }
+
+    var g = groupBox(shapes);
+    var ref = shapes[0];
+    if (el.dataset.before) Project.pushHistory(el.dataset.before);
+
+    switch (id) {
+      case 'g-x':    groupMove(shapes, v - g.cx, 0, 0); break;
+      case 'g-y':    groupMove(shapes, 0, v - g.cy, 0); break;
+      case 'g-elev': groupMove(shapes, 0, 0, v - g.bottom); break;
+
+      case 'g-rot':   groupOrient(shapes, v, ref.tiltX || 0, ref.tiltZ || 0); break;
+      case 'g-tiltx': groupOrient(shapes, ref.rotation || 0, v, ref.tiltZ || 0); break;
+      case 'g-tiltz': groupOrient(shapes, ref.rotation || 0, ref.tiltX || 0, v); break;
+
+      case 'g-w':
+      case 'g-d':
+      case 'g-h': {
+        var base = id === 'g-w' ? g.w : (id === 'g-d' ? g.d : g.height);
+        if (!(base > 1e-9) || !(v > 0)) { renderProps(); return; }
+        groupScale(shapes, v / base);
+        break;
+      }
+    }
+    say('Grup diperbarui (' + shapes.length + ' objek ikut).');
+  }
+
+  /** kotak grup: pusat denah, lebar/dalam, titik terendah, tinggi total */
+  function groupBox(shapes) {
+    var b = Project.bounds(shapes.map(function (s) { return s.id; }));
+    var bottom = groupBottom(shapes);
+    var top = Math.max.apply(null, shapes.map(function (s) {
+      var e = Shapes.planExtents(s);
+      return (s.elevation || 0) + e.cy + e.ey;
+    }));
+    return { cx: b.cx, cy: b.cy, w: b.w, d: b.h, bottom: bottom, height: top - bottom };
+  }
+
+  /** geser seluruh grup (satuan project) */
+  function groupMove(shapes, dx, dy, dElev) {
+    var u = Project.unit();
+    Project.updateMany(shapes.map(function (s) {
+      return { id: s.id, patch: {
+        x: Units.round(s.x + (dx || 0), u),
+        y: Units.round(s.y + (dy || 0), u),
+        elevation: Units.round((s.elevation || 0) + (dElev || 0), u)
+      } };
+    }), { source: 'ui', full: true });
+  }
+
+  /**
+   * Skala grup secara PROPORSIONAL dengan faktor k.
+   *
+   * Sengaja uniform (ketiga sumbu sekaligus), bukan per-sumbu: menskalakan
+   * satu sumbu saja akan menggepengkan anggota yang diputar miring — bentuknya
+   * tidak lagi bisa diwakili oleh width/depth/height. Uniform selalu eksak,
+   * berapa pun rotasi tiap anggotanya.
+   */
+  function groupScale(shapes, k) {
+    if (!(k > 0) || Math.abs(k - 1) < 1e-9) return;
+    var u = Project.unit();
+    var g = groupBox(shapes);
+    Project.updateMany(shapes.map(function (s) {
+      var e = Shapes.planExtents(s);
+      var bottom = (s.elevation || 0) + e.cy - e.ey;
+      return { id: s.id, patch: {
+        x: Units.roundFine(g.cx + (s.x - g.cx) * k, u),
+        y: Units.roundFine(g.cy + (s.y - g.cy) * k, u),
+        // elevasi diskalakan relatif terhadap dasar grup, supaya grup tetap
+        // bertumpu di tempat yang sama, bukan melayang
+        elevation: Units.roundFine((s.elevation || 0) + (g.bottom + (bottom - g.bottom) * k - bottom), u),
+        width: Units.roundFine(s.width * k, u),
+        depth: Units.roundFine(s.depth * k, u),
+        height: Units.roundFine(s.height * k, u)
+      } };
+    }), { source: 'ui', full: true });
+  }
+
+  /** putar grup rigid sampai orientasi acuannya jadi (yaw, tiltX, tiltZ) */
+  function groupOrient(shapes, yaw, tx, tz) {
+    var ref = shapes[0];
+    var cur = Shapes.composeRotation(ref.rotation || 0, ref.tiltX || 0, ref.tiltZ || 0);
+    var target = Shapes.composeRotation(yaw, tx, tz);
+    applyGroupRigid(shapes, Shapes.mat3Mul(target, Shapes.mat3Transpose(cur)));
   }
 
   function groupKeLantai(ids) {
@@ -1129,6 +1287,7 @@
     });
 
     bindSplitter();
+    bindRSplitter();
 
     $('btn-stl-all').onclick = function () { doExportSTL(null); };
     $('btn-stl-sel').onclick = function () {
@@ -1162,6 +1321,55 @@
     document.documentElement.style.setProperty('--split', pct + '%');
     try { localStorage.setItem(KEY_SPLIT, String(pct)); } catch (e) { /* private mode */ }
     return pct;
+  }
+
+  /** pembatas Properti / Objek di panel kanan — tingginya bisa digeser */
+  var KEY_RSPLIT = 'layout3d:rsplit';
+
+  function setRSplit(pct) {
+    pct = Math.max(18, Math.min(82, pct));
+    document.documentElement.style.setProperty('--rsplit', pct + '%');
+    try { localStorage.setItem(KEY_RSPLIT, String(pct)); } catch (e) { /* mode privat */ }
+    return pct;
+  }
+
+  function bindRSplitter() {
+    var sp = $('rsplit');
+    var right = $('right');
+    var dragging = false;
+
+    try {
+      var saved = parseFloat(localStorage.getItem(KEY_RSPLIT));
+      if (isFinite(saved)) setRSplit(saved);
+    } catch (e) { /* abaikan */ }
+
+    sp.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      dragging = true;
+      sp.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+    });
+
+    window.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      var r = right.getBoundingClientRect();
+      // dikurangi tinggi judul "Properti" supaya kursor pas di garis pembatas
+      var head = right.querySelector('.panel-head');
+      var top = r.top + (head ? head.offsetHeight : 0);
+      setRSplit(((e.clientY - top) / (r.height - (head ? head.offsetHeight : 0))) * 100);
+    });
+
+    window.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      sp.classList.remove('dragging');
+      document.body.style.cursor = '';
+    });
+
+    sp.addEventListener('dblclick', function () {
+      setRSplit(52);
+      say('Tinggi panel diseimbangkan.');
+    });
   }
 
   function bindSplitter() {

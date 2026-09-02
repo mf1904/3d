@@ -356,10 +356,29 @@ semuanya ikut terpilih dan bergerak bersama.
 | **Lepas** | pilih grupnya → tombol **Lepas Grup**, atau `Ctrl+Shift+G` |
 | **Pilih satu anggota saja** | `Alt`+klik objeknya di kanvas, atau klik namanya di daftar **Pilih satu untuk diedit** di panel Properti |
 
-Panel Properti hanya menampilkan form ukuran untuk seleksi tunggal. Karena
-memilih satu anggota grup otomatis memilih semuanya, panel multi-select memuat
-daftar anggota yang bisa diklik untuk fokus ke satu objek — tanpa itu anggota
-grup tidak akan pernah bisa diedit.
+### Mengedit grup sebagai satu benda
+
+Saat 2+ objek terpilih, panel Properti menampilkan form untuk **grupnya**:
+X, Y, rotasi/yaw, miring X & Z, ukuran (lebar/dalam/tinggi), dan elevasi dasar.
+
+| Yang diubah | Efeknya |
+|---|---|
+| X / Y / elevasi dasar | seluruh grup bergeser bersama, jarak antar anggota tetap |
+| rotasi / miring X / miring Z | grup diputar **rigid** terhadap pusatnya — posisi tiap anggota ikut berubah, bukan cuma orientasinya |
+| lebar / dalam / tinggi | grup diskalakan **proporsional**: posisi dan dimensi tiap anggota ikut faktor yang sama |
+
+Skala sengaja uniform (ketiga sumbu sekaligus), bukan per-sumbu. Menskalakan
+satu sumbu saja akan menggepengkan anggota yang diputar miring — bentuknya
+tidak lagi bisa diwakili oleh width/depth/height. Uniform selalu eksak, berapa
+pun rotasi tiap anggotanya.
+
+Hasil rotasi & penskalaan disimpan dengan pembulatan lebih halus daripada
+presisi tampilan (0,1 mm untuk meter). Kalau dibulatkan ke presisi tampilan,
+tiap putaran menggeser tiap titik sampai setengah satuan terakhir dan
+kesalahannya menumpuk saat grup diputar berulang.
+
+Untuk mengedit **satu anggota** saja: `Alt`+klik di kanvas, atau klik namanya
+di daftar **Pilih satu untuk diedit** di panel yang sama.
 
 Baris di panel Objek yang tergabung ditandai ikon rantai. Menggabung dua grup
 yang sudah ada akan melebur keduanya jadi satu grup baru — anggota lama ikut
@@ -371,6 +390,11 @@ terbawa, bukan cuma objek yang kebetulan terpilih.
 
 Pembatas antara panel 2D dan 3D bisa **digeser** untuk mengatur lebar
 (klik ganda = bagi sama rata). Lebarnya diingat per browser.
+
+Panel kanan juga punya pembatas geser antara **Properti** dan **Objek**: saat
+objek makin banyak, daftar Objek memanjang dan Properti tergencet — user yang
+paling tahu mana yang sedang dibutuhkan. Klik ganda mengembalikan ke seimbang;
+posisinya diingat per browser.
 
 Untuk fokus mengerjakan denah, panel 3D bisa disembunyikan sepenuhnya:
 tombol `»` di pembatas, tombol **2D** di toolbar, atau tekan `1`.

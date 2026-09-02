@@ -49,6 +49,22 @@
       return Math.round(v * f) / f;
     },
 
+    /**
+     * Pembulatan halus untuk hasil transformasi geometris (rotasi rigid,
+     * penskalaan grup).
+     *
+     * Pembulatan ke presisi TAMPILAN (1 cm untuk meter) cukup untuk angka yang
+     * diketik user, tapi merusak kalau dipakai menyimpan hasil rotasi: tiap
+     * putaran menggeser tiap titik sampai setengah satuan terakhir, dan
+     * kesalahannya menumpuk kalau grup diputar berulang kali. Dua digit ekstra
+     * (0,1 mm untuk meter) membuat penyimpangan itu tidak berarti, sementara
+     * angka di file tetap bersih — tanpa ekor 3.0000000000004.
+     */
+    roundFine: function (v, unit) {
+      var f = Math.pow(10, Units.def(unit).dec + 2);
+      return Math.round(v * f) / f;
+    },
+
     /** format angka + satuan, mis. "4.20 m" */
     fmt: function (v, unit, withUnit) {
       var d = Units.def(unit);

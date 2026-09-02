@@ -248,6 +248,22 @@ sisi ikut diperiksa.
 
 ---
 
+## Membaca koordinat
+
+Dua tempat sekaligus:
+
+- **Menempel di kursor** — kotak kecil mengikuti pointer, menampilkan X dan Y.
+  Kalau sedang menunjuk sebuah objek, barisnya bertambah: nama objek dan
+  **titik jangkarnya**. Bisa dimatikan lewat centang **Koordinat** di toolbar.
+- **Status bar** kiri bawah — sama isinya, untuk yang tidak suka ada kotak
+  mengikuti kursor.
+
+Penunjuk di kursor sengaja ikut menampilkan jangkar objek: jangkar ada di
+*tengah* denah (dan untuk objek miring, di tengah alas **sebelum** dimiringkan),
+yang gampang keliru kalau tidak ditunjukkan berdampingan dengan posisi kursor.
+
+---
+
 ## Navigasi kanvas 2D
 
 Mengikuti kebiasaan Photoshop/Figma:

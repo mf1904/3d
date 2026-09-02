@@ -1277,6 +1277,12 @@
       say('Snap sudut ' + (this.checked ? 'aktif (' + Project.state.snapAngle.step + '°)' : 'mati') + '.');
     });
 
+    $('chk-cursor').addEventListener('change', function () {
+      Project.state.cursorTip = this.checked;
+      Editor2D.refreshCursorTip();
+      say('Penunjuk koordinat ' + (this.checked ? 'aktif' : 'dimatikan') + '.');
+    });
+
     $('snap-angle-step').addEventListener('change', function () {
       Project.state.snapAngle.step = parseFloat(this.value);
       Editor2D.applySnapAngle();
@@ -1546,6 +1552,7 @@
     $('chk-snap-grid').checked = !!Project.state.grid.snap;
     $('chk-snap-angle').checked = !!Project.state.snapAngle.on;
     $('snap-angle-step').value = String(Project.state.snapAngle.step);
+    $('chk-cursor').checked = Project.state.cursorTip !== false;
     $('snap-angle-step').disabled = !Project.state.snapAngle.on;
     $('project-name').value = Project.state.name;
     Editor2D.applySnapAngle();

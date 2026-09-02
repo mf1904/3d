@@ -464,6 +464,7 @@
     });
 
     node.on('dragstart', function () {
+      hideCursorTip();
       Project.pushHistory();
       // titik awal dibaca dari data project, bukan dari posisi node: Konva bisa
       // sudah menggeser node yang di-drag sebelum handler ini jalan, dan itu
@@ -623,6 +624,74 @@
       message: message,
       kind: kind
     });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* penunjuk koordinat yang mengikuti kursor                            */
+  /*                                                                    */
+  /* Status bar sudah menampilkan koordinat, tapi letaknya jauh dari     */
+  /* kursor — mata harus bolak-balik saat menempatkan objek. Penunjuk    */
+  /* ini menempel di kursor, dan kalau sedang menunjuk objek, sekalian   */
+  /* menampilkan titik jangkarnya (yang ada di TENGAH denah, bukan di    */
+  /* pojok — gampang keliru kalau tidak ditunjukkan).                    */
+  /* ------------------------------------------------------------------ */
+  var cursorTip = null;
+
+  function ensureCursorTip() {
+    if (cursorTip) return cursorTip;
+    var g = new Konva.Group({ listening: false });
+    var bg = new Konva.Rect({
+      fill: 'rgba(18,22,28,0.88)', stroke: '#3d4a5c', strokeWidth: 1,
+      cornerRadius: 3, listening: false
+    });
+    var tx = new Konva.Text({
+      fontSize: 11, fontFamily: 'Segoe UI, sans-serif', fill: '#dfe8f2',
+      padding: 5, lineHeight: 1.35, listening: false
+    });
+    g.add(bg, tx);
+    overlayLayer.add(g);
+    cursorTip = { group: g, bg: bg, text: tx };
+    return cursorTip;
+  }
+
+  function hideCursorTip() {
+    if (cursorTip && cursorTip.group.visible()) {
+      cursorTip.group.visible(false);
+      overlayLayer.batchDraw();
+    }
+  }
+
+  function showCursorTip(world, hoverShape) {
+    if (!Project.state.cursorTip) { hideCursorTip(); return; }
+    var t = ensureCursorTip();
+    var s = scaleFactor(), u = unit();
+
+    var lines = ['X ' + Units.fmt(world.x, u) + '   Y ' + Units.fmt(world.y, u)];
+    if (hoverShape) {
+      lines.push((hoverShape.meta.label || Shapes.name(hoverShape.type)) +
+                 ' — jangkar ' + Units.fmt(hoverShape.x, u, false) + ' ; ' +
+                 Units.fmt(hoverShape.y, u, false));
+    }
+    t.text.text(lines.join('\n'));
+    t.bg.width(t.text.width());
+    t.bg.height(t.text.height());
+
+    // dipasang kanan-bawah kursor; kalau mepet tepi layar, dibalik arahnya
+    var padPx = 14;
+    var wPx = t.text.width(), hPx = t.text.height();
+    var scrX = world.x * s + stage.x(), scrY = world.y * s + stage.y();
+    var flipX = scrX + padPx + wPx > stage.width();
+    var flipY = scrY + padPx + hPx > stage.height();
+
+    t.group.scaleX(1 / s);
+    t.group.scaleY(1 / s);
+    t.group.position({
+      x: world.x + (flipX ? -(padPx + wPx) : padPx) / s,
+      y: world.y + (flipY ? -(padPx + hPx) : padPx) / s
+    });
+    t.group.visible(true);
+    t.group.moveToTop();
+    overlayLayer.batchDraw();
   }
 
   /**
@@ -1012,6 +1081,7 @@
   /* ------------------------------------------------------------------ */
   function wireStageEvents() {
     stage.container().addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    stage.container().addEventListener('mouseleave', hideCursorTip);
 
     stage.on('mousedown touchstart', function (e) {
       var mid = e.evt.button === 1 || e.evt.button === 2;
@@ -1038,6 +1108,7 @@
           syncDraw(dp);
           var el0 = document.getElementById('status-coords');
           if (el0) el0.textContent = 'X ' + Units.fmt(dp.x, unit()) + '   Y ' + Units.fmt(dp.y, unit());
+          showCursorTip(dp, null);
         }
         return;
       }
@@ -1046,6 +1117,13 @@
         var w = screenToWorld(p.x, p.y);
         var el = document.getElementById('status-coords');
         if (el) el.textContent = 'X ' + Units.fmt(w.x, unit()) + '   Y ' + Units.fmt(w.y, unit());
+        // saat menggeser / menarik kotak seleksi, penunjuk cuma menghalangi
+        if (panning || rubberStart) hideCursorTip();
+        else {
+          var hit = e.target && e.target !== stage && e.target.name() === 'shape'
+            ? Project.get(e.target.id()) : null;
+          showCursorTip(w, hit);
+        }
       }
       if (panning) {
         stage.position({
@@ -1259,6 +1337,7 @@
 
     startDraw: startDraw,
     highlightSide: highlightSide,
+    refreshCursorTip: function () { if (!Project.state.cursorTip) hideCursorTip(); },
     cancelDraw: cancelDraw,
     finishDraw: finishDraw,
     undoDrawPoint: undoDrawPoint,

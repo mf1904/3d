@@ -32,6 +32,7 @@
       scale: { unit: 'm', pxPerMeter: 40 },
       grid: { show: true, snap: false },
       snapAngle: { on: false, step: 15 },
+      cursorTip: true,        // penunjuk koordinat yang mengikuti kursor
       shapes: []
     };
   }
@@ -353,6 +354,7 @@
       p.snapAngle.on = !!raw.snapAngle.on;
       if (raw.snapAngle.step > 0) p.snapAngle.step = raw.snapAngle.step;
     }
+    if (typeof raw.cursorTip === 'boolean') p.cursorTip = raw.cursorTip;
     var skipped = 0;
     for (var i = 0; i < raw.shapes.length; i++) {
       var s = raw.shapes[i];

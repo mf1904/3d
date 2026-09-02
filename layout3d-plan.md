@@ -336,28 +336,40 @@ diberi "Berdiri Tegak" hasilnya idempoten (tidak berubah sama sekali).
 
 ## Status poin 7 & 8 (ditambahkan 2 September 2026)
 
-### Poin 7 — Polygon land tool: SEBAGIAN sudah ada
+### Poin 7 — Polygon land tool: SELESAI (2 September 2026)
 
-Yang **sudah jalan** (dibangun waktu mengerjakan "poligon gambar bebas"):
+Semua butir di poin 7 sudah jalan:
 
-- Tool freeform: klik titik-per-titik di kanvas, Shift mengunci arah kelipatan
-  45°, Backspace batal satu titik, Enter/klik titik awal untuk menutup
-- Edit vertex setelah jadi: geser titik, sisip titik di tengah sisi, Alt+klik
-  untuk hapus
-- Shoelace sudah ada di `Shapes.signedArea()` — tapi baru dipakai internal
-  untuk menolak poligon tanpa luas, **belum ditampilkan ke user**
-- Deteksi sisi saling menyilang + tombol perbaiki otomatis
+- Tool freeform: klik titik-per-titik, Shift mengunci kelipatan 45°, Backspace
+  batal satu titik, Enter/klik titik awal untuk menutup
+- Edit vertex: geser titik, sisip titik di tengah sisi, Alt+klik untuk hapus
+- **Panjang & sudut real-time saat menggambar**, termasuk pada sisi yang sedang
+  ditarik kursor — jadi bisa menggambar sesuai angka, bukan kira-kira lalu
+  dikoreksi belakangan
+- **Edit ukuran per sisi lewat input angka** di panel Properti (panjang & sudut)
+- **Luas** (shoelace) dan **keliling** tampil di panel
+- Tipe `land` (Bidang Tanah): datar, otomatis ke belakang, default tidak ikut
+  export STL — layer referensi, bukan massa cetak
+- Deteksi sisi menyilang + perbaiki otomatis
 
-Yang **belum**:
+Keputusan desain yang perlu dicatat: **model rantai**. Mengubah satu sisi pasti
+menggeser sesuatu karena poligon harus tetap tertutup. Titik sebelum sisi itu
+dikunci, titik sesudahnya bergeser, sisi penutup menyerap perubahan — sehingga
+sisi yang sudah diisi tidak pernah terganggu.
 
-- Panjang & sudut tiap sisi tampil real-time saat menggambar
-- Edit ukuran per sisi lewat input angka (ini yang bikin cocok dengan data
-  sertifikat/BPN — sekarang cuma bisa geser titik, tidak bisa ketik "sisi ini
-  12,4 m")
-- Luas tanah ditampilkan di panel
-- Tipe `land-boundary` sebagai layer tersendiri — sekarang poligon masih shape
-  biasa yang ikut ter-extrude jadi massa 3D, bukan bidang tanah datar
-- Validasi bangunan keluar boundary (memang ditandai v2 di rencana)
+Versi pertama fungsi ini salah: loop-nya menggeser/memutar semua titik kecuali
+jangkar, termasuk titik sebelumnya. Untuk sudut, itu memutar kedua sisi
+bersamaan sehingga sudutnya tidak berubah sama sekali; untuk panjang, yang
+menyerap jadi sisi *sebelum* yang diedit — justru sisi yang baru saja diisi
+user. Ketahuan lewat tes, lalu diganti ke model rantai yang benar.
+
+Sebagai konsekuensi jujur dari model itu, **sisi terakhir dan sudut di kedua
+ujung rantai tidak bisa disetel** (nilainya ditentukan sisi lain). Di UI
+keduanya ditampilkan tapi dikunci, lengkap dengan penjelasan di tooltip —
+bukan disembunyikan, supaya angkanya tetap kebaca.
+
+Yang memang ditandai v2 di rencana dan belum dikerjakan: validasi visual kalau
+ada bangunan keluar dari boundary tanah.
 
 ### Poin 8 — Design challenge: BELUM dimulai
 

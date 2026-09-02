@@ -45,6 +45,12 @@
     'polygon':    { name:'Poligon',        foot:'poly',    geo:'poly',     w:6,   d:6,   h:3,   color:C.build,
                     poly:function(){ var p=[],n=5,i,a; for(i=0;i<n;i++){ a=-Math.PI/2 + i*2*Math.PI/n; p.push([Math.cos(a)*0.5, Math.sin(a)*0.5]); } return p; } },
     'slab':       { name:'Lantai / Alas',  foot:'rect',    geo:'box',      w:12,  d:12,  h:0.2, color:'#7d8894' },
+    // Bidang tanah: layer referensi, bukan massa bangunan. Datar (tebal 5 cm
+    // sekadar supaya mesh-nya tetap tertutup), default TIDAK ikut export STL,
+    // dan otomatis ditaruh paling belakang supaya tidak menutupi denah.
+    'land':       { name:'Bidang Tanah',   foot:'poly',    geo:'poly',     w:20,  d:15,  h:0.05, color:'#6f8f5a',
+                    land:true, noExportDefault:true,
+                    poly:function(){ return [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]]; } },
 
     /* --- atap & kubah (dipasang di atas massa) --- */
     'roof-gable':   { name:'Atap Pelana',   foot:'rect', geo:'prismGable', w:8, d:6, h:2,   color:C.roof, roof:true },
@@ -91,6 +97,7 @@
     'box':         '<rect x="3" y="4" width="20" height="10"/>',
     'cylinder':    '<circle cx="13" cy="9" r="6"/>',
     'polygon':     '<path d="M13 2l10 7-4 8H7l-4-8z"/>',
+    'land':        '<path d="M2 13L7 4l9 1 8 6-5 6H6z" fill="none" stroke-width="1.8" stroke-dasharray="3 2"/>',
     'slab':        '<rect x="2" y="5" width="22" height="8" opacity=".55"/>',
     'roof-gable':  '<path d="M2 15L13 4l11 11z"/>',
     'roof-hip':    '<path d="M2 15L8 4h10l6 11z"/>',
@@ -132,6 +139,7 @@
   var LIBRARY = [
     { category: 'Struktur',      types: ['wall', 'wall-corner', 'column', 'column-sq', 'door', 'window', 'stairs'] },
     { category: 'Bangunan',      types: ['room', 'box', 'cylinder', 'polygon', 'slab'] },
+    { category: 'Tanah',         types: ['land'] },
     { category: 'Atap & Kubah',  types: ['roof-gable', 'roof-hip', 'roof-halfcyl', 'roof-shed', 'roof-pyramid', 'dome', 'cone', 'sphere'] },
     { category: 'Mesin & Pabrik', types: ['m-machine', 'm-rotary', 'm-conveyor', 'm-tank', 'm-hopper', 'm-panel'] },
     { category: 'Furniture',     types: ['f-table', 'f-chair', 'f-bed', 'f-wardrobe', 'f-sofa', 'f-round', 'f-car', 'f-tree'] }
@@ -202,6 +210,8 @@
     },
 
     isVisible: function (s) { return !s.meta || s.meta.visible !== false; },
+
+    isLand: function (type) { return !!Shapes.def(type).land; },
 
     /** pintu/jendela — bisa melubangi dinding yang ditempelinya */
     isOpening: function (type) { return !!Shapes.def(type).opening; },
@@ -470,7 +480,7 @@
         meta: {
           label: d.name,
           color: d.color,
-          solid: true,
+          solid: !d.noExportDefault,
           locked: false,
           visible: true
         }
@@ -619,6 +629,141 @@
         return [p[0] * shape.width, p[1] * shape.depth];
       });
     },
+
+    /* ------------------------------------------------------------------ */
+    /* ukuran sisi & sudut — untuk mencocokkan dengan data sertifikat/BPN  */
+    /* ------------------------------------------------------------------ */
+
+    /** luas poligon (selalu positif), satuan project kuadrat */
+    polygonArea: function (pts) {
+      return Math.abs(Shapes.signedArea(pts));
+    },
+
+    /** keliling poligon */
+    polygonPerimeter: function (pts) {
+      var t = 0;
+      for (var i = 0; i < pts.length; i++) {
+        var j = (i + 1) % pts.length;
+        t += Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]);
+      }
+      return t;
+    },
+
+    /**
+     * Rincian tiap sisi poligon: panjang, arah (bearing), dan sudut dalam di
+     * titik AWAL sisi itu.
+     *
+     * Sudut dihitung sebagai sudut dalam poligon, jadi angkanya bisa langsung
+     * dibandingkan dengan data ukur — bukan sudut arah yang perlu ditafsir
+     * ulang. Untuk poligon berlawanan arah jarum jam maupun searah, hasilnya
+     * sama (arah putar dinormalkan dulu).
+     *
+     * @returns [{i, len, bearing, angle}] — i = indeks titik awal sisi
+     */
+    polygonSides: function (pts) {
+      var n = pts.length, out = [], i;
+      if (n < 3) return out;
+      // arah putar menentukan tanda sudut dalam; normalkan supaya konsisten
+      var ccw = Shapes.signedArea(pts) > 0;
+
+      for (i = 0; i < n; i++) {
+        var prev = pts[(i - 1 + n) % n], cur = pts[i], next = pts[(i + 1) % n];
+        var dx = next[0] - cur[0], dy = next[1] - cur[1];
+        var len = Math.hypot(dx, dy);
+
+        // sudut dalam di titik `cur`, antara sisi masuk dan sisi keluar
+        var a1 = Math.atan2(prev[1] - cur[1], prev[0] - cur[0]);
+        var a2 = Math.atan2(next[1] - cur[1], next[0] - cur[0]);
+        var ang = (a2 - a1) * (ccw ? -1 : 1);
+        while (ang < 0) ang += Math.PI * 2;
+        while (ang > Math.PI * 2) ang -= Math.PI * 2;
+
+        out.push({
+          i: i,
+          len: len,
+          bearing: Math.atan2(dy, dx) * 180 / Math.PI,
+          angle: ang * 180 / Math.PI
+        });
+      }
+      return out;
+    },
+
+    /**
+     * Ubah panjang satu sisi jadi `newLen`, arah sisinya dipertahankan.
+     *
+     * Aturannya "rantai": titik-titik SESUDAH sisi ini ikut bergeser sejauh
+     * selisihnya, jadi panjang & sudut sisi-sisi lain tetap persis — kecuali
+     * sisi penutup (dari titik terakhir kembali ke titik pertama), yang memang
+     * harus menyerap perubahan supaya poligonnya tetap tertutup.
+     *
+     * Ini menyesuaikan cara orang membaca data ukur: sisi dimasukkan satu per
+     * satu, dan sisi terakhir yang menutup bidang. Alternatifnya — menggeser
+     * satu titik saja — akan diam-diam mengubah panjang sisi tetangganya, yang
+     * justru merusak angka yang baru saja dimasukkan user.
+     *
+     * @param pts    titik lokal
+     * @param idx    indeks titik awal sisi
+     * @param newLen panjang baru (satuan project)
+     * @returns titik-titik baru, atau null kalau tidak valid
+     */
+    setSideLength: function (pts, idx, newLen) {
+      var n = pts.length;
+      if (n < 3 || idx < 0 || idx >= n || !(newLen > 0)) return null;
+      // sisi terakhir adalah sisi penutup: panjangnya ditentukan oleh semua
+      // sisi lain, tidak bisa disetel sendiri tanpa merusak salah satunya
+      if (idx >= n - 1) return null;
+
+      var a = pts[idx], b = pts[idx + 1];
+      var dx = b[0] - a[0], dy = b[1] - a[1];
+      var len = Math.hypot(dx, dy);
+      if (!(len > 1e-9)) return null;                 // sisi berimpit, arah tak jelas
+
+      var k = (newLen - len) / len;
+      var mx = dx * k, my = dy * k;
+
+      // titik 0..idx terkunci; titik sesudahnya bergeser sejauh selisihnya
+      var out = pts.map(function (p) { return [p[0], p[1]]; });
+      for (var j = idx + 1; j < n; j++) {
+        out[j][0] += mx;
+        out[j][1] += my;
+      }
+      return out;
+    },
+
+    /**
+     * Ubah sudut dalam di titik `idx` jadi `newDeg`, dengan memutar seluruh
+     * rantai sesudahnya mengelilingi titik itu. Sama seperti setSideLength,
+     * sisi penutup yang menyerap perubahan.
+     */
+    setVertexAngle: function (pts, idx, newDeg) {
+      var n = pts.length;
+      if (n < 3 || !isFinite(newDeg)) return null;
+      // Titik 0 dan titik terakhir mengapit sisi penutup. Sudut di sana
+      // ditentukan oleh sisa poligon — kalau dipaksa diputar, kedua sisinya
+      // ikut bergerak bersama dan sudutnya tidak berubah sama sekali.
+      if (idx < 1 || idx > n - 2) return null;
+
+      var cur = Shapes.polygonSides(pts)[idx].angle;
+      var ccw = Shapes.signedArea(pts) > 0;
+      var delta = (newDeg - cur) * Math.PI / 180 * (ccw ? -1 : 1);
+      if (!isFinite(delta)) return null;
+
+      var p = pts[idx];
+      var c = Math.cos(delta), s = Math.sin(delta);
+      var out = pts.map(function (q) { return [q[0], q[1]]; });
+      // hanya rantai SESUDAH titik ini yang berputar; sisi masuk tetap diam,
+      // jadi sudut di antara keduanya benar-benar berubah
+      for (var j = idx + 1; j < n; j++) {
+        var vx = out[j][0] - p[0], vy = out[j][1] - p[1];
+        out[j][0] = p[0] + vx * c - vy * s;
+        out[j][1] = p[1] + vx * s + vy * c;
+      }
+      return out;
+    },
+
+    /** apakah panjang sisi / sudut di indeks ini bisa disetel lewat angka? */
+    canSetSide:  function (n, idx) { return idx >= 0 && idx < n - 1; },
+    canSetAngle: function (n, idx) { return idx >= 1 && idx <= n - 2; },
 
     /**
      * Coba perbaiki poligon yang sisinya saling menyilang, dengan mengurutkan

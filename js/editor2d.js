@@ -580,6 +580,36 @@
     });
   }
 
+  /**
+   * Sorot satu sisi poligon di kanvas — dipakai saat kolom ukuran sisi
+   * difokus di panel, supaya jelas sisi mana yang sedang diubah angkanya.
+   * @param id  id shape, atau null untuk mematikan sorotan
+   */
+  var sideHi = null;
+  function highlightSide(id, idx) {
+    if (sideHi) { sideHi.destroy(); sideHi = null; }
+    var s = id ? Project.get(id) : null;
+    if (s) {
+      var local = Shapes.polygonLocal(s);
+      if (local.length >= 3 && idx >= 0 && idx < local.length) {
+        var a = local[idx], b = local[(idx + 1) % local.length];
+        var rot = (s.rotation || 0) * Math.PI / 180;
+        var c = Math.cos(rot), n = Math.sin(rot);
+        var w = function (p) {
+          return [s.x + (p[0] * c - p[1] * n), s.y + (p[0] * n + p[1] * c)];
+        };
+        var wa = w(a), wb = w(b);
+        sideHi = new Konva.Line({
+          points: [wa[0], wa[1], wb[0], wb[1]],
+          stroke: '#e8b84b', strokeWidth: 4, strokeScaleEnabled: false,
+          lineCap: 'round', listening: false, opacity: 0.9
+        });
+        overlayLayer.add(sideHi);
+      }
+    }
+    overlayLayer.batchDraw();
+  }
+
   function startDraw() {
     if (draw) cancelDraw();
     exitVertexEdit();
@@ -680,7 +710,65 @@
       draw.dots[i].radius((first ? HANDLE_PX + 3 : HANDLE_PX) / s);
       draw.dots[i].fill(first ? '#4da3ff' : '#12161c');
     }
+
+    syncDrawLabels(cursor, s);
     overlayLayer.batchDraw();
+  }
+
+  /**
+   * Label panjang tiap sisi + sudut di tiap titik, tampil sambil menggambar.
+   * Sisi yang sedang ditarik kursor ikut dilabeli, jadi panjangnya kelihatan
+   * SEBELUM titiknya ditaruh — itu yang bikin bisa menggambar sesuai angka
+   * ukur, bukan cuma kira-kira lalu dikoreksi belakangan.
+   */
+  function syncDrawLabels(cursor, s) {
+    if (!draw) return;
+    draw.labels = draw.labels || [];
+
+    var u = unit();
+    var segs = [];                       // {x, y, text} dalam koordinat dunia
+    var pts = draw.pts.slice();
+    if (cursor && pts.length && !nearFirst(cursor)) pts.push([cursor.x, cursor.y]);
+
+    var i;
+    for (i = 0; i + 1 < pts.length; i++) {
+      var a = pts[i], b = pts[i + 1];
+      var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len * s < 26) continue;        // terlalu pendek di layar, malah berantakan
+      segs.push({
+        x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2,
+        text: Units.fmt(len, u), kind: 'len'
+      });
+    }
+    // sudut dalam di titik-titik yang sudah pasti (butuh sisi kiri & kanan)
+    for (i = 1; i + 1 < pts.length; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var a1 = Math.atan2(p0[1] - p1[1], p0[0] - p1[0]);
+      var a2 = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
+      var ang = Math.abs(a2 - a1) * 180 / Math.PI;
+      if (ang > 180) ang = 360 - ang;
+      segs.push({ x: p1[0], y: p1[1], text: Math.round(ang) + '°', kind: 'ang' });
+    }
+
+    while (draw.labels.length < segs.length) {
+      var t = new Konva.Text({
+        fontSize: 11, fontFamily: 'Segoe UI, sans-serif',
+        listening: false, shadowColor: '#0b0e12', shadowBlur: 3, shadowOpacity: 0.95
+      });
+      draw.labels.push(t);
+      draw.group.add(t);
+    }
+    while (draw.labels.length > segs.length) draw.labels.pop().destroy();
+
+    for (i = 0; i < segs.length; i++) {
+      var lb = draw.labels[i];
+      lb.text(segs[i].text);
+      lb.fill(segs[i].kind === 'ang' ? '#e8b84b' : '#dfe8f2');
+      lb.scaleX(1 / s); lb.scaleY(1 / s);
+      lb.offsetX(lb.width() / 2);
+      lb.offsetY(segs[i].kind === 'ang' ? -8 / s : lb.height() / 2 + 6 / s);
+      lb.position({ x: segs[i].x, y: segs[i].y });
+    }
   }
 
   /** apakah titik ini praktis menimpa titik terakhir yang sudah ditaruh? */
@@ -1099,6 +1187,7 @@
     setSpace: setSpace,
 
     startDraw: startDraw,
+    highlightSide: highlightSide,
     cancelDraw: cancelDraw,
     finishDraw: finishDraw,
     undoDrawPoint: undoDrawPoint,

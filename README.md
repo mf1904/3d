@@ -196,6 +196,44 @@ Geser dan putar tetap bisa; ukuran diedit lewat panel properti. Objek tegak
 
 ---
 
+## Bidang tanah & ukuran per sisi
+
+Tipe **Bidang Tanah** (kategori *Tanah*) adalah poligon untuk batas lahan.
+Bedanya dari poligon biasa: datar (tebal 5 cm, sekadar supaya mesh-nya tetap
+tertutup), otomatis ditaruh paling belakang, dan **default tidak ikut export
+STL** — ini layer referensi, bukan massa yang dicetak.
+
+### Menggambar sesuai angka, bukan kira-kira
+
+Data tanah biasanya datang sebagai angka per sisi dari sertifikat/BPN, bukan
+gambar. Karena itu ada dua jalur:
+
+- **Saat menggambar**: panjang tiap sisi dan sudut di tiap titik tampil
+  langsung di kanvas, termasuk sisi yang sedang ditarik kursor — jadi
+  panjangnya kelihatan *sebelum* titiknya ditaruh.
+- **Setelah jadi**: panel Properti punya tabel **Ukuran per sisi**. Ketik
+  panjang atau sudutnya, bentuknya menyesuaikan.
+
+Panel juga menampilkan **luas** (shoelace) dan **keliling**, ikut satuan project.
+
+### Aturan saat sebuah sisi diubah
+
+Poligon harus tetap tertutup, jadi mengubah satu sisi pasti menggeser sesuatu.
+Aturannya model rantai: **titik sebelum sisi itu terkunci, titik sesudahnya
+bergeser**, dan sisi penutup yang menyerap perubahannya.
+
+Konsekuensinya sisi yang sudah diisi sebelumnya tidak pernah terganggu — cocok
+dengan cara orang memasukkan data ukur: sisi 1, sisi 2, sisi 3…, dan sisi
+terakhir yang menutup bidang.
+
+Karena itu pula **sisi terakhir dan sudut di kedua ujung rantai terkunci** di
+tabel (ditampilkan, tapi tidak bisa diketik): nilainya ditentukan oleh sisi-sisi
+lain. Memaksa mengubahnya akan merusak angka yang sudah benar — pada sudut
+ujung, memutar rantai justru menggerakkan kedua sisinya bersamaan sehingga
+sudutnya tidak berubah sama sekali.
+
+---
+
 ## Sembunyikan objek
 
 Tiap baris di panel **Objek** punya ikon mata. Klik untuk menyembunyikan /

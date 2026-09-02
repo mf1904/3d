@@ -126,8 +126,13 @@
 
     var s = Shapes.create(type, u, over);
     Project.add([s]);
+    // bidang tanah = alas referensi; taruh paling belakang supaya tidak
+    // menutupi bangunan yang digambar di atasnya
+    if (Shapes.isLand(type)) Project.reorder([s.id], -1);
     Project.setSelection([s.id]);
-    say('Ditambahkan: ' + s.meta.label);
+    say(Shapes.isLand(type)
+      ? 'Bidang tanah ditambahkan. Pakai "Edit Titik" atau tabel ukuran sisi untuk menyesuaikan dengan data ukur.'
+      : 'Ditambahkan: ' + s.meta.label);
   }
 
   function addPreset(id) {
@@ -262,6 +267,7 @@
       var crossing = Array.isArray(s.points) && s.points.length >= 3 &&
                      Shapes.selfIntersects(Shapes.polygonLocal(s));
       $('poly-cross').hidden = !crossing;
+      renderPolySides(s);
     }
 
     // kotak info grup (hanya kalau shape ini anggota grup)
@@ -275,6 +281,141 @@
         'Memilih salah satu akan memilih semuanya.';
     } else {
       box.hidden = true;
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* poligon: luas, keliling, dan ukuran per sisi                        */
+  /*                                                                    */
+  /* Ini yang bikin tool-nya kepakai untuk bidang tanah: data sertifikat */
+  /* datang sebagai angka per sisi, bukan gambar. Jadi sisi harus bisa   */
+  /* DIKETIK, bukan cuma digeser.                                        */
+  /* ------------------------------------------------------------------ */
+
+  /** satuan luas menyesuaikan satuan panjang project */
+  function fmtArea(v, u) {
+    var lbl = Units.def(u).label;
+    var txt = v >= 100 ? v.toFixed(1) : v.toFixed(2);
+    return txt.replace(/\.?0+$/, '') + ' ' + lbl + '²';
+  }
+
+  function renderPolySides(s) {
+    var u = Project.unit();
+    var local = Shapes.polygonLocal(s);
+    var box = $('poly-sides');
+
+    if (!local || local.length < 3) {
+      box.innerHTML = '';
+      $('poly-area').textContent = '—';
+      $('poly-perim').textContent = '—';
+      return;
+    }
+
+    $('poly-area').textContent = fmtArea(Shapes.polygonArea(local), u);
+    $('poly-perim').textContent = Units.fmt(Shapes.polygonPerimeter(local), u);
+
+    // jangan gambar ulang tabel saat user sedang mengetik di dalamnya —
+    // kursor akan lompat dan angkanya berebut dengan yang sedang diketik
+    if (box.contains(document.activeElement)) {
+      refreshSideValues(local);
+      return;
+    }
+
+    var sides = Shapes.polygonSides(local);
+    var n = sides.length;
+    var html = '<div class="sides-head"><span>#</span><span>Panjang</span><span>Sudut</span></div>';
+    sides.forEach(function (sd, i) {
+      // Sisi penutup dan sudut di kedua ujung rantai ditentukan oleh sisi lain
+      // — dikunci, bukan disembunyikan, supaya angkanya tetap kebaca.
+      var lenOk = Shapes.canSetSide(n, i);
+      var angOk = Shapes.canSetAngle(n, i);
+      html += '<div class="side-row" data-i="' + i + '">' +
+        '<span class="idx">' + (i + 1) + '</span>' +
+        '<input type="number" step="any" min="0" data-kind="len" ' +
+          (lenOk ? '' : 'disabled ') +
+          'value="' + Units.round(sd.len, u) + '" title="' +
+          (lenOk ? 'Panjang sisi ' + (i + 1)
+                 : 'Sisi penutup — panjangnya mengikuti sisi lain') + '">' +
+        '<input type="number" step="any" data-kind="ang" ' +
+          (angOk ? '' : 'disabled ') +
+          'value="' + (Math.round(sd.angle * 10) / 10) + '" title="' +
+          (angOk ? 'Sudut dalam di titik ' + (i + 1)
+                 : 'Sudut ujung rantai — ditentukan oleh sisi penutup') + '">' +
+        '</div>';
+    });
+    box.innerHTML = html;
+
+    box.querySelectorAll('input').forEach(function (inp) {
+      inp.addEventListener('focus', function () {
+        inp.dataset.before = JSON.stringify(Project.serialize());
+        inp.parentNode.classList.add('on');
+        Editor2D.highlightSide(s.id, Number(inp.parentNode.dataset.i));
+      });
+      inp.addEventListener('blur', function () {
+        inp.parentNode.classList.remove('on');
+        Editor2D.highlightSide(null);
+      });
+      inp.addEventListener('change', function () { applySide(inp); });
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      });
+    });
+  }
+
+  /** perbarui angka di tabel tanpa membangun ulang DOM-nya */
+  function refreshSideValues(local) {
+    var u = Project.unit();
+    var sides = Shapes.polygonSides(local);
+    $('poly-sides').querySelectorAll('.side-row').forEach(function (row) {
+      var sd = sides[Number(row.dataset.i)];
+      if (!sd) return;
+      row.querySelectorAll('input').forEach(function (inp) {
+        if (inp === document.activeElement) return;   // jangan ganggu yang diketik
+        inp.value = inp.dataset.kind === 'len'
+          ? Units.round(sd.len, u)
+          : Math.round(sd.angle * 10) / 10;
+      });
+    });
+  }
+
+  function applySide(inp) {
+    var sel = Project.selection;
+    if (sel.length !== 1) return;
+    var s = Project.get(sel[0]);
+    if (!s) return;
+
+    var idx = Number(inp.parentNode.dataset.i);
+    var v = parseFloat(inp.value);
+    var u = Project.unit();
+    var local = Shapes.polygonLocal(s);
+
+    var next = inp.dataset.kind === 'len'
+      ? Shapes.setSideLength(local, idx, v)
+      : Shapes.setVertexAngle(local, idx, v);
+
+    if (!next) {
+      say('Nilai tidak valid untuk sisi ' + (idx + 1) + '.', 'warn');
+      renderPolySides(s);
+      return;
+    }
+
+    var patch = Shapes.polygonPatchFromLocal(s, next, u);
+    if (!patch) {
+      say('Hasilnya bikin bidang jadi tanpa luas — diabaikan.', 'warn');
+      renderPolySides(s);
+      return;
+    }
+
+    if (inp.dataset.before) Project.pushHistory(inp.dataset.before);
+    Project.update(s.id, patch, { source: 'ui', full: true });
+    inp.dataset.before = JSON.stringify(Project.serialize());
+
+    var after = Shapes.polygonLocal(Project.get(s.id));
+    if (Shapes.selfIntersects(after)) {
+      say('Sisi ' + (idx + 1) + ' diubah, tapi bidangnya jadi menyilang — cek lagi.', 'warn');
+    } else {
+      say('Sisi ' + (idx + 1) + ' disetel. Luas sekarang ' +
+          fmtArea(Shapes.polygonArea(after), u) + '.');
     }
   }
 

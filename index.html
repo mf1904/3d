@@ -160,6 +160,20 @@
               <div class="poly-warn-msg">&#9888; Sisinya saling menyilang &mdash; tidak bisa diekstrusi jadi mesh tertutup.</div>
               <button id="btn-poly-fix" class="tb" title="Urutkan ulang titik supaya tidak saling menyilang">Perbaiki Otomatis</button>
             </div>
+
+            <div id="poly-metrics" class="poly-metrics">
+              <div><span>Luas</span><b id="poly-area">&mdash;</b></div>
+              <div><span>Keliling</span><b id="poly-perim">&mdash;</b></div>
+            </div>
+
+            <div class="sep">Ukuran per sisi</div>
+            <div id="poly-sides" class="sides"></div>
+            <div class="grp-tip">
+              Ketik panjang atau sudut sesuai data ukur. Titik sesudahnya ikut
+              bergeser, jadi sisi yang sudah diisi tetap persis &mdash; sisi
+              penutup yang menyesuaikan. Karena itu sisi terakhir dan sudut di
+              kedua ujungnya terkunci: nilainya mengikuti sisi-sisi lain.
+            </div>
           </div>
           <div class="btn-row">
             <button id="btn-front" class="tb" title="Bawa ke depan">Ke Depan</button>

@@ -52,6 +52,7 @@
       <label class="chk" title="Snap posisi ke grid"><input type="checkbox" id="chk-snap-grid"> Grid</label>
       <label class="chk" title="Snap rotasi ke kelipatan sudut"><input type="checkbox" id="chk-snap-angle"> Sudut</label>
       <label class="chk" title="Tampilkan koordinat mengikuti kursor"><input type="checkbox" id="chk-cursor" checked> Koordinat</label>
+      <label class="chk" title="Tampilkan nama objek di panel 3D"><input type="checkbox" id="chk-label3d" checked> Nama 3D</label>
       <select id="snap-angle-step" title="Kelipatan snap sudut" disabled>
         <option value="5">5&deg;</option>
         <option value="15" selected>15&deg;</option>
@@ -148,6 +149,7 @@
           <div class="sep">Opsi</div>
           <label class="chk block" id="row-cut" hidden><input type="checkbox" id="p-cut"> Lubangi dinding yang ditempeli</label>
           <label class="chk block"><input type="checkbox" id="p-solid"> Sertakan di export STL</label>
+          <label class="chk block" title="Objek ini menolak ditumpuk objek lain saat digeser di kanvas"><input type="checkbox" id="p-nooverlap"> Tidak boleh bertumpuk objek lain</label>
           <label class="chk block"><input type="checkbox" id="p-locked"> Kunci (tidak bisa digeser)</label>
           <div class="btn-row">
             <button id="btn-dup" class="tb" title="Duplikat (Ctrl+D)">Duplikat</button>

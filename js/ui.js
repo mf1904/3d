@@ -152,7 +152,7 @@
   var P = {};
   function cacheProps() {
     ['label', 'type', 'color', 'x', 'y', 'rot', 'tiltx', 'tiltz',
-     'w', 'd', 'h', 'elev', 'thickness', 'solid', 'locked', 'cut']
+     'w', 'd', 'h', 'elev', 'thickness', 'solid', 'locked', 'cut', 'nooverlap']
       .forEach(function (k) { P[k] = $('p-' + k); });
   }
 
@@ -194,6 +194,12 @@
         '</div>' +
         '<div class="grp-tip">Tidurkan Grup memutar grup sebagai satu kesatuan (posisi &amp; kemiringan tiap ' +
         'bagian ikut berubah, susunan relatifnya terjaga) &mdash; bukan cuma memiringkan tiap bagian di tempat.</div>' +
+        '<div class="sep">Nama grup</div>' +
+        '<input type="text" id="g-name" placeholder="mis. Line Produksi 1" ' +
+          'value="' + escapeHtml(Shapes.groupName(sel[0])) + '">' +
+        '<div class="grp-tip">Diberi nama = label anggotanya diganti SATU label ' +
+        'grup, di denah maupun 3D. Kosongkan untuk kembali menampilkan nama ' +
+        'tiap objek.</div>' +
         groupFormHtml(sel) +
         '<div class="sep">Pilih satu untuk diedit</div>' +
         '<div class="grp-list">' +
@@ -213,6 +219,7 @@
           Project.setSelection([b.getAttribute('data-pick')], { raw: true });
         };
       });
+      bindGroupName();
       bindGroupForm();
       $('btn-group').onclick = doGroup;
       $('btn-ungroup-multi').onclick = doUngroup;
@@ -246,6 +253,7 @@
     P.elev.value = Units.round(s.elevation || 0, u);
     P.solid.checked = s.meta.solid !== false;
     P.locked.checked = !!s.meta.locked;
+    P.nooverlap.checked = !!s.meta.noOverlap;
 
     var isOpening = Shapes.isOpening(s.type);
     $('row-cut').hidden = !isOpening;
@@ -569,6 +577,38 @@
       'Rotasi &amp; kemiringan diputar rigid terhadap pusat grup.</div>';
   }
 
+  /** nama grup: satu nilai, ditulis ke semua anggota sekaligus */
+  function bindGroupName() {
+    var el = $('g-name');
+    if (!el) return;
+    var before = null;
+    el.addEventListener('focus', function () { before = JSON.stringify(Project.serialize()); });
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    });
+    el.addEventListener('change', function () {
+      var shapes = Project.selectedShapes();
+      if (shapes.length < 2) return;
+      var nm = el.value.trim();
+      if (before) { Project.pushHistory(before); before = null; }
+      Project.updateMany(shapes.map(function (s) {
+        return { id: s.id, patch: { meta: { groupName: nm } } };
+      }), { source: 'ui', full: true });
+      // string kosong dianggap "tidak dinamai": bersihkan supaya label tiap
+      // objek muncul lagi dan JSON-nya tidak menyimpan field kosong
+      if (!nm) {
+        shapes.forEach(function (s) {
+          var live = Project.get(s.id);
+          if (live && live.meta) delete live.meta.groupName;
+        });
+        Editor2D.rebuild();
+        Viewer3D.rebuildLabels();
+      }
+      say(nm ? 'Grup dinamai "' + nm + '" — anggotanya kini pakai satu label.'
+             : 'Nama grup dihapus — tiap objek menampilkan namanya lagi.');
+    });
+  }
+
   /** pasang handler untuk form properti grup */
   function bindGroupForm() {
     var ids = ['g-x', 'g-y', 'g-rot', 'g-tiltx', 'g-tiltz', 'g-w', 'g-d', 'g-h', 'g-elev'];
@@ -743,6 +783,17 @@
       Project.update(sel[0], { meta: { solid: P.solid.checked } }, { source: 'ui', full: true });
     });
 
+    P.nooverlap.addEventListener('change', function () {
+      var sel = Project.selection;
+      if (!sel.length) return;
+      var on = P.nooverlap.checked;
+      Project.updateMany(sel.map(function (id) {
+        return { id: id, patch: { meta: { noOverlap: on } } };
+      }), { source: 'ui', full: true });
+      say(on ? 'Objek ini kini menolak ditumpuk saat digeser.'
+             : 'Objek ini boleh bertumpuk lagi.');
+    });
+
     P.locked.addEventListener('change', function () {
       var sel = Project.selection;
       if (sel.length !== 1) return;
@@ -842,6 +893,42 @@
     }), { source: 'ui', full: true });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* susun ulang daftar objek dengan seret-lepas                         */
+  /*                                                                    */
+  /* Urutan daftar dibalik dari urutan penyimpanan: baris teratas adalah */
+  /* shape terakhir di array, karena yang digambar belakangan tampil di  */
+  /* depan. Karena itu urutan baru dihitung dari susunan DOM lalu        */
+  /* dibalik — lebih aman daripada menghitung indeks manual.             */
+  /* ------------------------------------------------------------------ */
+  var dragRowId = null;
+
+  function clearDropMark() {
+    $('layer-list').querySelectorAll('.layer').forEach(function (r) {
+      r.classList.remove('drop-before', 'drop-after');
+    });
+  }
+
+  function markDrop(row, where) {
+    clearDropMark();
+    row.classList.add(where === 'after' ? 'drop-after' : 'drop-before');
+  }
+
+  function dropRowOn(movedId, targetId, where) {
+    clearDropMark();
+    var visual = [].slice.call($('layer-list').querySelectorAll('.layer'))
+      .map(function (r) { return r.dataset.id; })
+      .filter(function (id) { return id !== movedId; });
+
+    var at = visual.indexOf(targetId);
+    if (at < 0) return;
+    visual.splice(where === 'after' ? at + 1 : at, 0, movedId);
+
+    // daftar tampil atas→bawah = paling depan→paling belakang
+    Project.setOrder(visual.slice().reverse());
+    say('Urutan objek diperbarui.');
+  }
+
   function renderLayers() {
     var wrap = $('layer-list');
     var sel = Project.selection;
@@ -879,6 +966,37 @@
           else Project.setSelection([s.id]);
         };
         row.ondblclick = function () { Editor2D.fit([s.id]); };
+
+        // urutan daftar = urutan gambar di denah (paling atas = paling depan).
+        // Bisa disusun ulang dengan menyeret barisnya.
+        row.draggable = true;
+        row.dataset.id = s.id;
+        row.addEventListener('dragstart', function (e) {
+          dragRowId = s.id;
+          row.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          // Firefox butuh data supaya drag-nya jalan
+          try { e.dataTransfer.setData('text/plain', s.id); } catch (err) { /* abaikan */ }
+        });
+        row.addEventListener('dragend', function () {
+          row.classList.remove('dragging');
+          clearDropMark();
+          dragRowId = null;
+        });
+        row.addEventListener('dragover', function (e) {
+          if (!dragRowId || dragRowId === s.id) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          var r = row.getBoundingClientRect();
+          markDrop(row, (e.clientY - r.top) > r.height / 2 ? 'after' : 'before');
+        });
+        row.addEventListener('drop', function (e) {
+          e.preventDefault();
+          if (!dragRowId || dragRowId === s.id) return;
+          var r = row.getBoundingClientRect();
+          dropRowOn(dragRowId, s.id, (e.clientY - r.top) > r.height / 2 ? 'after' : 'before');
+        });
+
         wrap.appendChild(row);
       })(shapes[i]);
     }
@@ -1283,6 +1401,12 @@
       say('Penunjuk koordinat ' + (this.checked ? 'aktif' : 'dimatikan') + '.');
     });
 
+    $('chk-label3d').addEventListener('change', function () {
+      Project.state.label3d = this.checked;
+      Viewer3D.rebuildLabels();
+      say('Nama objek di 3D ' + (this.checked ? 'ditampilkan' : 'disembunyikan') + '.');
+    });
+
     $('snap-angle-step').addEventListener('change', function () {
       Project.state.snapAngle.step = parseFloat(this.value);
       Editor2D.applySnapAngle();
@@ -1553,6 +1677,7 @@
     $('chk-snap-angle').checked = !!Project.state.snapAngle.on;
     $('snap-angle-step').value = String(Project.state.snapAngle.step);
     $('chk-cursor').checked = Project.state.cursorTip !== false;
+    $('chk-label3d').checked = Project.state.label3d !== false;
     $('snap-angle-step').disabled = !Project.state.snapAngle.on;
     $('project-name').value = Project.state.name;
     Editor2D.applySnapAngle();

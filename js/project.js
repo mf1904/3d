@@ -33,6 +33,7 @@
       grid: { show: true, snap: false },
       snapAngle: { on: false, step: 15 },
       cursorTip: true,        // penunjuk koordinat yang mengikuti kursor
+      label3d: true,          // nama objek tampil di panel 3D
       shapes: []
     };
   }
@@ -200,9 +201,18 @@
     if (all.length < 2) return null;
     pushHistory();
     var g = Shapes.uid();
+    // kalau salah satu grup lama sudah punya nama, nama itu dibawa —
+    // menggabung grup bernama ke seleksi lain tidak menghapus namanya
+    var inherited = '';
     for (var i = 0; i < all.length; i++) {
+      var o = get(all[i]);
+      if (o && o.meta && o.meta.groupName) { inherited = o.meta.groupName; break; }
+    }
+    for (i = 0; i < all.length; i++) {
       var s = get(all[i]);
-      if (s) s.meta.group = g;
+      if (!s) continue;
+      s.meta.group = g;
+      if (inherited) s.meta.groupName = inherited;
     }
     changed({ reason: 'group', ids: all, full: true });
     return { id: g, ids: all };
@@ -218,10 +228,30 @@
     pushHistory();
     for (var i = 0; i < all.length; i++) {
       var s = get(all[i]);
-      if (s) delete s.meta.group;
+      if (s) { delete s.meta.group; delete s.meta.groupName; }
     }
     changed({ reason: 'ungroup', ids: all, full: true });
     return all;
+  }
+
+  /**
+   * Susun ulang seluruh daftar sesuai urutan gambar yang diberikan
+   * (indeks awal = paling belakang, indeks akhir = paling depan).
+   * Id yang tidak disebut tetap di urutan relatifnya, ditaruh di belakang.
+   */
+  function setOrder(ids) {
+    pushHistory();
+    var map = {}, i;
+    for (i = 0; i < state.shapes.length; i++) map[state.shapes[i].id] = state.shapes[i];
+    var out = [];
+    for (i = 0; i < ids.length; i++) {
+      if (map[ids[i]]) { out.push(map[ids[i]]); delete map[ids[i]]; }
+    }
+    for (i = 0; i < state.shapes.length; i++) {
+      if (map[state.shapes[i].id]) out.push(state.shapes[i]);
+    }
+    state.shapes = out;
+    changed({ reason: 'reorder', full: true });
   }
 
   function reorder(ids, dir) {
@@ -355,6 +385,7 @@
       if (raw.snapAngle.step > 0) p.snapAngle.step = raw.snapAngle.step;
     }
     if (typeof raw.cursorTip === 'boolean') p.cursorTip = raw.cursorTip;
+    if (typeof raw.label3d === 'boolean') p.label3d = raw.label3d;
     var skipped = 0;
     for (var i = 0; i < raw.shapes.length; i++) {
       var s = raw.shapes[i];
@@ -376,10 +407,12 @@
           color: (s.meta && s.meta.color) || d.color,
           solid: !(s.meta && s.meta.solid === false),
           locked: !!(s.meta && s.meta.locked),
+          noOverlap: !!(s.meta && s.meta.noOverlap),
           visible: !(s.meta && s.meta.visible === false)
         }
       };
       if (s.meta && s.meta.group) o.meta.group = s.meta.group;
+      if (s.meta && s.meta.group && s.meta.groupName) o.meta.groupName = String(s.meta.groupName);
       if (d.opening) o.meta.cut = !(s.meta && s.meta.cut === false);
       if (s.meta && typeof s.meta.thickness === 'number') o.meta.thickness = s.meta.thickness;
       else if (d.thickness) o.meta.thickness = d.thickness * Units.factor('m', p.scale.unit);
@@ -524,7 +557,7 @@
     on: on, emit: emit,
     get: get, indexOf: indexOf,
     add: add, remove: remove, update: update, updateMany: updateMany,
-    duplicate: duplicate, reorder: reorder,
+    duplicate: duplicate, reorder: reorder, setOrder: setOrder,
     group: group, ungroup: ungroup, expandGroups: expandGroups,
     setSelection: setSelection, toggleSelection: toggleSelection, selectedShapes: selectedShapes,
     setUnit: setUnit, rescale: rescale,

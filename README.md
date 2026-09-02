@@ -307,6 +307,52 @@ berlawanan — menggulir itu menggeser *pandangan*, menyeret itu menggenggam
 
 ---
 
+## Nama & label
+
+Nama objek tampil di **denah 2D** dan di **panel 3D** (label 3D berupa billboard
+yang selalu menghadap kamera; ukurannya mengikuti jarak kamera supaya tetap
+terbaca di rumah 10 m maupun pabrik 80 m). Bisa dimatikan lewat centang
+**Nama 3D** di toolbar.
+
+### Nama grup
+
+Anggota grup sering bertumpuk persis di titik yang sama — badan, atap, dan
+isinya — sehingga labelnya saling menimpa. Beri **Nama grup** di panel Properti
+(muncul saat 2+ objek terpilih) dan seluruh anggota diganti **satu label**
+berwarna kuning di tengah grup, di denah maupun 3D. Kosongkan untuk kembali
+menampilkan nama tiap objek.
+
+---
+
+## Anti-tabrakan
+
+Centang **Tidak boleh bertumpuk objek lain** di panel Properti. Saat objek itu
+diseret di denah, gerakannya berhenti di batas objek lain alih-alih menembus.
+
+| Perilaku | Alasan |
+|---|---|
+| Kalau arah diagonal tertahan, objek **meluncur** menyusuri sisi yang ditabrak | membekukannya total bikin menempatkan mesin rapat ke tetangga jadi menyiksa |
+| Cukup **salah satu** objek dicentang | menandai sebuah mesin melindunginya dari ditumpuki objek mana pun |
+| Harus bertindih di denah **dan** rentang tingginya beririsan | tanpa syarat tinggi, atap di atas badan atau lantai 2 di atas lantai 1 ikut dianggap tabrakan |
+| Bersentuhan tepat di tepi bukan tabrakan | supaya bisa menempel rapat |
+| Bidang tanah, alas lantai, pintu & jendela tidak pernah ikut dihitung | memang untuk ditempati/ditempeli |
+| Objek yang **sudah** bertumpuk sejak awal tetap bebas digeser | kalau diblokir, objeknya malah terkurung dan tidak bisa dirapikan |
+
+Pengecekan memakai kotak berputar (OBB) lewat teorema sumbu pemisah, jadi objek
+yang diputar miring diukur pada bentuk aslinya — bukan kotak sejajar sumbu yang
+melar. Nilai X/Y yang **diketik** di panel tidak diblokir: itu masukan yang
+disengaja dan presisi.
+
+---
+
+## Urutan objek
+
+Daftar **Objek** bisa disusun ulang dengan **menyeret barisnya**. Urutannya =
+urutan gambar di denah: baris teratas digambar paling depan. Objek terbaru
+otomatis masuk paling atas.
+
+---
+
 ## Sembunyikan objek
 
 Tiap baris di panel **Objek** punya ikon mata. Klik untuk menyembunyikan /

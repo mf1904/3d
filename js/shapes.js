@@ -213,6 +213,11 @@
 
     isLand: function (type) { return !!Shapes.def(type).land; },
 
+    /** nama grup (kalau grupnya diberi nama), selain itu string kosong */
+    groupName: function (s) {
+      return (s && s.meta && s.meta.group && s.meta.groupName) ? s.meta.groupName : '';
+    },
+
     /** pintu/jendela — bisa melubangi dinding yang ditempelinya */
     isOpening: function (type) { return !!Shapes.def(type).opening; },
 
@@ -764,6 +769,82 @@
     /** apakah panjang sisi / sudut di indeks ini bisa disetel lewat angka? */
     canSetSide:  function (n, idx) { return idx >= 0 && idx < n - 1; },
     canSetAngle: function (n, idx) { return idx >= 1 && idx <= n - 2; },
+
+    /* ------------------------------------------------------------------ */
+    /* tabrakan antar objek                                               */
+    /* ------------------------------------------------------------------ */
+
+    /** objek ini ikut diperhitungkan saat mengecek tabrakan? */
+    canCollide: function (s) {
+      var d = Shapes.def(s.type);
+      // Bidang tanah & alas lantai memang untuk ditempati, dan pintu/jendela
+      // memang menempel di dinding — kalau ikut dihitung, semuanya langsung
+      // dianggap bertabrakan dan tidak ada yang bisa digeser.
+      return !d.land && !d.opening && s.type !== 'slab' && Shapes.isVisible(s);
+    },
+
+    /** objek ini menolak ditumpuki / menumpuk objek lain? */
+    noOverlap: function (s) { return !!(s.meta && s.meta.noOverlap); },
+
+    /** rentang tinggi objek di dunia: [dasar, puncak] */
+    zRange: function (s) {
+      var e = Shapes.planExtents(s);
+      var c = (s.elevation || 0) + e.cy;
+      return [c - e.ey, c + e.ey];
+    },
+
+    /**
+     * Dua kotak denah (yang boleh berputar) bertindih?
+     * Memakai teorema sumbu pemisah: dua persegi panjang TIDAK bertindih
+     * kalau ada satu sumbu — di antara empat arah sisinya — yang membuat
+     * proyeksi keduanya terpisah.
+     */
+    obbOverlap: function (a, b, tol) {
+      var A = Shapes.footprintCorners(a), B = Shapes.footprintCorners(b);
+      var axes = [], i;
+      [A, B].forEach(function (P) {
+        for (var k = 0; k < 2; k++) {          // dua arah sisi sudah cukup
+          var dx = P[k + 1][0] - P[k][0], dy = P[k + 1][1] - P[k][1];
+          var L = Math.hypot(dx, dy) || 1;
+          axes.push([-dy / L, dx / L]);
+        }
+      });
+      var eps = tol || 1e-6;
+      for (i = 0; i < axes.length; i++) {
+        var ax = axes[i];
+        var a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity, j, p;
+        for (j = 0; j < A.length; j++) { p = A[j][0] * ax[0] + A[j][1] * ax[1]; a0 = Math.min(a0, p); a1 = Math.max(a1, p); }
+        for (j = 0; j < B.length; j++) { p = B[j][0] * ax[0] + B[j][1] * ax[1]; b0 = Math.min(b0, p); b1 = Math.max(b1, p); }
+        if (a1 <= b0 + eps || b1 <= a0 + eps) return false;   // ada sumbu pemisah
+      }
+      return true;
+    },
+
+    /**
+     * Bertabrakan? Harus bertindih di denah DAN rentang tingginya beririsan.
+     * Tanpa syarat tinggi, atap di atas badan atau lantai 2 di atas lantai 1
+     * akan dianggap tabrakan padahal justru itu yang diinginkan.
+     */
+    hits: function (a, b) {
+      if (a.id === b.id) return false;
+      if (!Shapes.canCollide(a) || !Shapes.canCollide(b)) return false;
+      // cukup salah satu ditandai: menandai sebuah mesin melindunginya dari
+      // ditumpuki objek mana pun, bukan cuma yang sama-sama ditandai
+      if (!Shapes.noOverlap(a) && !Shapes.noOverlap(b)) return false;
+
+      var za = Shapes.zRange(a), zb = Shapes.zRange(b);
+      var eps = 1e-6;
+      if (za[1] <= zb[0] + eps || zb[1] <= za[0] + eps) return false;  // cuma bertumpu
+      return Shapes.obbOverlap(a, b);
+    },
+
+    /** ada objek lain yang ditabrak `shape`? kembalikan yang pertama, atau null */
+    firstHit: function (shape, others) {
+      for (var i = 0; i < others.length; i++) {
+        if (Shapes.hits(shape, others[i])) return others[i];
+      }
+      return null;
+    },
 
     /* ------------------------------------------------------------------ */
     /* validasi batas tanah                                               */

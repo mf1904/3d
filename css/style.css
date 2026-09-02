@@ -205,6 +205,11 @@ body[data-view="3d"] #pane-2d{display:none}
 #props-multi{text-align:left}
 #props-multi .row,#props-multi .row2{margin-bottom:7px}
 #props-multi label{display:block;font-size:10.5px;color:var(--fg-mute);margin-bottom:2px;letter-spacing:.3px}
+#props-multi input[type=text]{
+  width:100%;background:var(--bg-3);border:1px solid var(--line);color:var(--fg);
+  border-radius:4px;padding:5px 7px;font-size:12px;font-family:inherit;
+}
+#props-multi input[type=text]:focus{outline:none;border-color:var(--accent)}
 #props-multi input[type=number]{
   width:100%;background:var(--bg-3);border:1px solid var(--line);color:var(--fg);
   border-radius:4px;padding:5px 7px;font-size:12px;font-family:inherit;
@@ -298,6 +303,15 @@ body[data-view="3d"] #pane-2d{display:none}
 .layer .eye svg{width:14px;height:14px;display:block}
 .layer.sel .eye{color:rgba(255,255,255,.8)}
 .layer.off{opacity:.45}
+.layer{position:relative}
+.layer[draggable=true]{cursor:grab}
+.layer.dragging{opacity:.4;cursor:grabbing}
+.layer.drop-before::before,.layer.drop-after::after{
+  content:'';position:absolute;left:2px;right:2px;height:2px;
+  background:var(--accent);border-radius:1px;
+}
+.layer.drop-before::before{top:-1px}
+.layer.drop-after::after{bottom:-1px}
 .layer.off .nm{text-decoration:line-through;text-decoration-color:var(--fg-mute)}
 .layer .sw{width:9px;height:9px;border-radius:2px;flex:0 0 auto;border:1px solid rgba(0,0,0,.35)}
 .layer .nm{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

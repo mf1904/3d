@@ -18,6 +18,8 @@
   var spaceDown = false;
   var panning = null;
   var rubberStart = null;
+  var dragOrigShape = {};   // posisi shape (bukan node) saat drag mulai
+  var dragCollide = false;  // cek tabrakan aktif untuk drag ini?
 
   /* ------------------------------------------------------------------ */
   function unit() { return Project.state.scale.unit; }
@@ -327,6 +329,11 @@
     var wPx = e.ex * 2 * s, dPx = e.ez * 2 * s;
     var show = wPx > 44 && dPx > 20 && Shapes.isVisible(shape);
 
+    // Anggota grup bernama tidak dilabeli sendiri-sendiri — grup itu dapat
+    // SATU label di tengahnya (lihat syncGroupLabels). Tanpa ini, badan,
+    // atap, dan isinya saling menimpa persis di titik yang sama.
+    if (Shapes.groupName(shape)) show = false;
+
     if (!show) { if (t) t.visible(false); return; }
 
     var txt = shape.meta.label || Shapes.name(shape.type);
@@ -364,7 +371,52 @@
   function refreshLabels() {
     var shapes = Project.shapes;
     for (var i = 0; i < shapes.length; i++) updateLabel(shapes[i]);
+    syncGroupLabels();
     overlayLayer.batchDraw();
+  }
+
+  /* satu label per grup bernama, ditaruh di tengah kumpulan anggotanya */
+  var groupLabels = {};
+
+  function syncGroupLabels() {
+    var s = scaleFactor();
+    var groups = {}, i;
+    var shapes = Project.shapes;
+
+    for (i = 0; i < shapes.length; i++) {
+      var nm = Shapes.groupName(shapes[i]);
+      if (!nm || !Shapes.isVisible(shapes[i])) continue;
+      var g = shapes[i].meta.group;
+      (groups[g] || (groups[g] = { name: nm, ids: [] })).ids.push(shapes[i].id);
+    }
+
+    // buang label grup yang sudah tidak ada lagi
+    for (var key in groupLabels) {
+      if (!groups[key]) { groupLabels[key].destroy(); delete groupLabels[key]; }
+    }
+
+    for (var gid in groups) {
+      var info = groups[gid];
+      var b = Project.bounds(info.ids);
+      if (!b) continue;
+
+      var t = groupLabels[gid];
+      if (!t) {
+        t = new Konva.Text({
+          fontSize: 12, fontStyle: 'bold', fontFamily: 'Segoe UI, sans-serif',
+          fill: '#ffd479', align: 'center', listening: false,
+          shadowColor: '#0b0e12', shadowBlur: 4, shadowOpacity: 0.95
+        });
+        groupLabels[gid] = t;
+        overlayLayer.add(t);
+      }
+      t.text(info.name);
+      t.visible(b.w * s > 40);
+      t.scaleX(1 / s); t.scaleY(1 / s);
+      t.offsetX(t.width() / 2);
+      t.offsetY(t.height() / 2);
+      t.position({ x: b.cx, y: b.cy });
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -416,7 +468,8 @@
   function rebuild() {
     shapeLayer.destroyChildren();
     for (var k in labels) labels[k].destroy();
-    nodes = {}; labels = {};
+    for (var gk in groupLabels) groupLabels[gk].destroy();
+    nodes = {}; labels = {}; groupLabels = {};
 
     var shapes = Project.shapes;
     for (var i = 0; i < shapes.length; i++) {
@@ -425,6 +478,7 @@
       shapeLayer.add(n);
       updateLabel(shapes[i]);
     }
+    syncGroupLabels();
     shapeLayer.batchDraw();
     syncTransformer();
     syncLandWarnings();
@@ -470,12 +524,29 @@
       // sudah menggeser node yang di-drag sebelum handler ini jalan, dan itu
       // bikin delta untuk anggota seleksi lain meleset
       dragStartPos = {};
+      dragOrigShape = {};
       var sel = Project.selection;
       if (sel.indexOf(node.id()) < 0) sel = [node.id()];
       for (var i = 0; i < sel.length; i++) {
         var s = Project.get(sel[i]);
-        if (s && nodes[sel[i]] && Shapes.isVisible(s)) dragStartPos[sel[i]] = nodeCenter(s);
+        if (s && nodes[sel[i]] && Shapes.isVisible(s)) {
+          dragStartPos[sel[i]] = nodeCenter(s);
+          dragOrigShape[sel[i]] = { x: s.x, y: s.y };
+        }
       }
+
+      // Cek tabrakan hanya kalau ada yang menolak ditumpuk DAN posisi awalnya
+      // memang sudah bebas. Kalau dari awal sudah bertindih, memblokir justru
+      // mengurung objeknya — user tidak akan bisa merapikannya.
+      var ids = Object.keys(dragStartPos);
+      var others = Project.shapes.filter(function (o) { return ids.indexOf(o.id) < 0; });
+      var adaAturan = ids.some(function (id) {
+        var sh = Project.get(id);
+        return sh && (Shapes.noOverlap(sh) ||
+          others.some(function (o) { return Shapes.noOverlap(o) && Shapes.canCollide(sh); }));
+      });
+      dragCollide = adaAturan && !dragHits(0, 0);
+      setBlocked(false);
     });
 
     node.dragBoundFunc(function (pos) {
@@ -491,6 +562,15 @@
       var origin = dragStartPos[node.id()];
       if (!origin) return;
       var dx = node.x() - origin.x, dy = node.y() - origin.y;
+
+      // Tertahan objek lain? Coba geser satu sumbu saja supaya bisa
+      // "meluncur" menyusuri sisi benda yang ditabrak — kalau langsung
+      // dibekukan, menempatkan mesin rapat ke tetangganya jadi menyiksa.
+      var res = resolveDrag(dx, dy);
+      dx = res.dx; dy = res.dy;
+      node.x(origin.x + dx);
+      node.y(origin.y + dy);
+
       for (var id in dragStartPos) {
         if (id === node.id()) continue;
         var n = nodes[id];
@@ -507,7 +587,51 @@
     node.on('dragend', function () {
       commitNodes(Object.keys(dragStartPos || {}), true);
       dragStartPos = null;
+      dragOrigShape = {};
+      dragCollide = false;
+      setBlocked(false);
     });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* tabrakan saat menggeser                                             */
+  /* ------------------------------------------------------------------ */
+  var dragBlocked = false;
+
+  /** apakah kumpulan yang digeser menabrak sesuatu pada pergeseran (dx,dy)? */
+  function dragHits(dx, dy) {
+    var moving = Object.keys(dragStartPos);
+    var others = Project.shapes.filter(function (s) { return moving.indexOf(s.id) < 0; });
+
+    for (var i = 0; i < moving.length; i++) {
+      var s = Project.get(moving[i]);
+      if (!s) continue;
+      var probe = Object.assign({}, s, {
+        x: dragOrigShape[s.id].x + dx,
+        y: dragOrigShape[s.id].y + dy
+      });
+      if (Shapes.firstHit(probe, others)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Pergeseran terbesar yang masih bebas tabrakan. Urutannya: coba penuh,
+   * lalu satu sumbu saja (meluncur), lalu diam.
+   */
+  function resolveDrag(dx, dy) {
+    if (!dragCollide) return { dx: dx, dy: dy };
+    if (!dragHits(dx, dy)) { setBlocked(false); return { dx: dx, dy: dy }; }
+    if (!dragHits(dx, 0))  { setBlocked(true);  return { dx: dx, dy: 0 }; }
+    if (!dragHits(0, dy))  { setBlocked(true);  return { dx: 0,  dy: dy }; }
+    setBlocked(true);
+    return { dx: 0, dy: 0 };
+  }
+
+  function setBlocked(on) {
+    if (on === dragBlocked) return;
+    dragBlocked = on;
+    stage.container().style.cursor = on ? 'not-allowed' : 'default';
   }
 
   /** baca attr node -> patch shape */

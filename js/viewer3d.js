@@ -182,6 +182,7 @@
     }
     autoGrid();
     updateHighlight();
+    rebuildLabels();
     needsRender = true;
   }
 
@@ -192,6 +193,7 @@
       var m = meshById[ids[i]], s = Project.get(ids[i]);
       if (m && s) placeMesh(m, s, unit);
     }
+    rebuildLabels();      // label ikut posisi barunya
     needsRender = true;
   }
 
@@ -259,6 +261,7 @@
     }
     autoGrid();
     updateHighlight();
+    rebuildLabels();
     needsRender = true;
   }
 
@@ -287,7 +290,125 @@
       ctrl.target.z + ctrl.radius * Math.sin(sp) * Math.cos(ctrl.theta)
     );
     camera.lookAt(ctrl.target);
+    scaleLabels();
     needsRender = true;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* label nama di 3D                                                    */
+  /*                                                                    */
+  /* Dipakai Sprite (billboard) supaya tulisannya selalu menghadap       */
+  /* kamera tanpa perlu diputar tiap frame. depthTest dimatikan: label   */
+  /* yang tertutup badan bangunan tidak ada gunanya.                    */
+  /*                                                                    */
+  /* Ukurannya diperbarui mengikuti jarak kamera, jadi tetap terbaca     */
+  /* baik di rumah 10 m maupun pabrik 80 m.                              */
+  /* ------------------------------------------------------------------ */
+  var labelGroup = null;
+
+  function makeLabelSprite(text, accent) {
+    var pad = 18, fs = 46;
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
+    var w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+    var h = fs + pad;
+    c.width = w; c.height = h;
+
+    ctx = c.getContext('2d');
+    ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(12,16,22,0.82)';
+    var r = 10;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(w - r, 0); ctx.quadraticCurveTo(w, 0, w, r);
+    ctx.lineTo(w, h - r); ctx.quadraticCurveTo(w, h, w - r, h);
+    ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h - r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.fill();
+
+    ctx.fillStyle = accent ? '#ffd479' : '#e6edf5';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, pad, h / 2 + 2);
+
+    var tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;                 // tanpa mipmap: teks tetap tajam
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthTest: false, depthWrite: false
+    }));
+    sp.userData.noExport = true;
+    sp.userData.aspect = w / h;
+    sp.renderOrder = 999;
+    return sp;
+  }
+
+  /** ukuran label dibuat mengikuti jarak kamera supaya terlihat tetap */
+  function scaleLabels() {
+    if (!labelGroup) return;
+    var hWorld = ctrl.radius * 0.035;
+    for (var i = 0; i < labelGroup.children.length; i++) {
+      var sp = labelGroup.children[i];
+      sp.scale.set(hWorld * sp.userData.aspect, hWorld, 1);
+    }
+  }
+
+  function clearLabels() {
+    if (!labelGroup) return;
+    for (var i = labelGroup.children.length - 1; i >= 0; i--) {
+      var sp = labelGroup.children[i];
+      labelGroup.remove(sp);
+      if (sp.material.map) sp.material.map.dispose();
+      sp.material.dispose();
+    }
+  }
+
+  function rebuildLabels() {
+    if (!labelGroup) { labelGroup = new THREE.Group(); scene.add(labelGroup); }
+    clearLabels();
+    if (!Project.state.label3d) { needsRender = true; return; }
+
+    var unit = Project.state.scale.unit;
+    var m = function (v) { return Units.toM(v, unit); };
+    var shapes = Project.shapes;
+    var groups = {}, i;
+
+    for (i = 0; i < shapes.length; i++) {
+      var s = shapes[i];
+      if (!Shapes.isVisible(s)) continue;
+
+      // grup bernama dapat SATU label bersama, sama seperti di denah 2D
+      var gname = Shapes.groupName(s);
+      if (gname) {
+        var g = groups[s.meta.group] || (groups[s.meta.group] = { name: gname, ids: [] });
+        g.ids.push(s.id);
+        continue;
+      }
+
+      var e = Shapes.planExtents(s);
+      var top = m((s.elevation || 0) + e.cy + e.ey);
+      var o = Shapes.planOffset(s);
+      addLabel(s.meta.label || Shapes.name(s.type),
+               m(s.x + o.x), top, m(s.y + o.y), false);
+    }
+
+    for (var gid in groups) {
+      var info = groups[gid];
+      var b = Project.bounds(info.ids);
+      if (!b) continue;
+      var topG = Math.max.apply(null, info.ids.map(function (id) {
+        var sh = Project.get(id), ex = Shapes.planExtents(sh);
+        return (sh.elevation || 0) + ex.cy + ex.ey;
+      }));
+      addLabel(info.name, m(b.cx), m(topG), m(b.cy), true);
+    }
+
+    scaleLabels();
+    needsRender = true;
+  }
+
+  function addLabel(text, x, y, z, accent) {
+    var sp = makeLabelSprite(String(text).slice(0, 40), accent);
+    sp.position.set(x, y + ctrl.radius * 0.03, z);
+    labelGroup.add(sp);
   }
 
   /** sumbu kanan & atas layar dalam koordinat dunia, untuk menggeser target */
@@ -510,6 +631,7 @@
     init: init,
     resize: resize,
     rebuild: rebuild,
+    rebuildLabels: rebuildLabels,
     fit: fit,
     exportables: exportables,
     invalidate: function () { needsRender = true; },

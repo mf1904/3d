@@ -1,0 +1,17 @@
+{
+  "name": "layout3d-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend save/load untuk layout3d — 3d.dodaa.id (tanpa dependensi native)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "set-password": "node tools/set-password.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

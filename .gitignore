@@ -1,0 +1,12 @@
+# dependensi — dipasang ulang lewat `npm install` di server
+node_modules/
+
+# data runtime backend: hash password, sesi login, dan project tersimpan.
+# JANGAN pernah masuk repo (apalagi repo publik).
+server/data/
+server/logs/
+
+# artefak lokal
+*.log
+.DS_Store
+Thumbs.db

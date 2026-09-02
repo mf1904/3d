@@ -66,11 +66,28 @@ Selain box (extrude standar), tambahkan:
 - Alur: layout site (posisi tiap bangunan + rotasi, karena antar-gedung bisa tidak sejajar) → tiap bangunan dikembangkan sendiri (badan + atap) → gabung jadi satu scene 3D → export STL (per-bangunan atau keseluruhan site)
 - Untuk MVP, cukup sediakan preset kombinasi: "rumah" (box + gable roof), "gudang" (box + half-cylinder), "masjid" (box + dome + cone kecil di atasnya) — biar user tinggal pilih preset lalu adjust ukuran
 
+### 7. Polygon land tool (bidang tanah tidak beraturan)
+Kasus nyata: bidang tanah sering segi-4+ dengan sisi tidak sejajar/tidak siku, dan user biasanya punya data ukuran per sisi dari sertifikat/BPN (bukan cuma gambar visual).
+- Tool freeform polygon — user klik titik-titik di canvas buat bikin outline tanah, tiap vertex bisa digeser individual setelah dibuat
+- Tiap sisi tampilkan panjang & sudut real-time saat digambar, dan bisa diedit manual via input angka per sisi (bukan cuma drag) — supaya cocok dengan data ukur resmi
+- Auto-hitung luas tanah dari polygon (shoelace formula)
+- Bidang tanah adalah **layer terpisah** (`type: "land-boundary"`), beda dari layer shape bangunan — bangunan digambar di dalam boundary ini
+- Opsional (v2): validasi visual kalau ada shape bangunan yang keluar dari boundary tanah
+
+### 8. Mode "design challenge" / kompetisi desain
+Konsep: admin bikin project template (polygon tanah + constraint), publish jadi challenge, peserta desain di dalamnya pakai layout3d, lalu submit.
+- **Template project**: admin set polygon tanah (pakai tool di poin 7) + constraint tambahan — orientasi utara, KDB/luas bangunan maksimal, jumlah lantai maksimal, opsional budget cap
+- **Submission**: peserta fork/duplicate template, desain site plan + denah tiap lantai di dalam boundary, lalu submit — format submission = project JSON yang sudah ada (tidak perlu format terpisah)
+- **Gallery/listing**: halaman publik buat browse semua submission per challenge
+- **Judging (v2, belum MVP)**: kombinasi kriteria (fungsi/tata ruang, efisiensi lahan, estetika, kepatuhan ke brief), opsional anonim saat judging (sembunyikan nama peserta), opsional fase voting publik terpisah dari juri profesional
+- MVP scope: cukup "template + submission gallery" dulu, scoring/voting menyusul
+
 ## Yang perlu didefinisikan user sebelum coding (checklist buat Claude Code tanya balik kalau belum jelas)
 - Satuan default: cm atau meter?
 - Apakah snap-to-angle default on atau off?
 - STL export per-shape/per-bangunan, atau selalu export keseluruhan scene jadi satu file?
 - Auth dulu atau localStorage-only untuk MVP (sebelum backend save jalan)?
+- Mode challenge/kompetisi ini prioritas MVP juga, atau fitur v2 setelah core editor stabil?
 
 ## Urutan build yang disarankan
 1. 2D canvas dasar: shape dasar (box, circle) + drag/resize/rotate + panel properti (termasuk skala & zoom)
@@ -78,7 +95,9 @@ Selain box (extrude standar), tambahkan:
 3. Tambah primitif atap (half-cylinder, gable, dome, cone) sebagai layer terpisah di atas badan
 4. STL export dari scene 3D
 5. Shape library diperluas + preset miniatur (rumah/gudang/masjid)
-6. Backend save/load (auth + SQLite JSON storage)
+6. Polygon land tool (boundary tanah tidak beraturan + input ukuran per sisi)
+7. Backend save/load (auth + SQLite JSON storage)
+8. Mode design challenge (template, submission, gallery) — setelah core editor + backend save stabil
 
 ---
 
@@ -312,3 +331,45 @@ kemiringan sekarang, dihitung dari anggota pertama sebagai acuan), bukan reset
 per-objek. Diverifikasi: siklus Tidurkan→Berdiri Tegak mengembalikan posisi
 relatif antar anggota persis sama (delta <1e-3), dan grup yang sudah tegak
 diberi "Berdiri Tegak" hasilnya idempoten (tidak berubah sama sekali).
+
+---
+
+## Status poin 7 & 8 (ditambahkan 2 September 2026)
+
+### Poin 7 — Polygon land tool: SEBAGIAN sudah ada
+
+Yang **sudah jalan** (dibangun waktu mengerjakan "poligon gambar bebas"):
+
+- Tool freeform: klik titik-per-titik di kanvas, Shift mengunci arah kelipatan
+  45°, Backspace batal satu titik, Enter/klik titik awal untuk menutup
+- Edit vertex setelah jadi: geser titik, sisip titik di tengah sisi, Alt+klik
+  untuk hapus
+- Shoelace sudah ada di `Shapes.signedArea()` — tapi baru dipakai internal
+  untuk menolak poligon tanpa luas, **belum ditampilkan ke user**
+- Deteksi sisi saling menyilang + tombol perbaiki otomatis
+
+Yang **belum**:
+
+- Panjang & sudut tiap sisi tampil real-time saat menggambar
+- Edit ukuran per sisi lewat input angka (ini yang bikin cocok dengan data
+  sertifikat/BPN — sekarang cuma bisa geser titik, tidak bisa ketik "sisi ini
+  12,4 m")
+- Luas tanah ditampilkan di panel
+- Tipe `land-boundary` sebagai layer tersendiri — sekarang poligon masih shape
+  biasa yang ikut ter-extrude jadi massa 3D, bukan bidang tanah datar
+- Validasi bangunan keluar boundary (memang ditandai v2 di rencana)
+
+### Poin 8 — Design challenge: BELUM dimulai
+
+Satu hal yang perlu diputuskan sebelum ini dikerjakan: **arsitektur auth-nya
+bertabrakan dengan keputusan yang sudah diambil.** Backend sekarang sengaja
+dibuat satu-password-untuk-satu-orang (jawaban "dipakai sendiri saja"), tanpa
+tabel user, tanpa registrasi.
+
+Mode challenge butuh yang sebaliknya: banyak peserta, masing-masing punya akun
+dan hanya boleh menyunting submission miliknya sendiri, plus peran admin dan
+(nanti) juri. Itu bukan penambahan kecil di atas yang ada — itu mengganti
+fondasi autentikasinya, dan menyeret konsekuensi lain: registrasi, reset
+password, moderasi, dan gallery publik yang bisa diakses tanpa login.
+
+Jadi poin 8 realistis dikerjakan sebagai fase tersendiri, bukan tempelan.

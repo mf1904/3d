@@ -1080,6 +1080,14 @@
     });
   }
 
+  function bindPrintButton() {
+    var b = $('btn-print');
+    if (!b) return;
+    b.onclick = function () {
+      if (typeof Printout !== 'undefined') Printout.dialog();
+    };
+  }
+
   function bindChallengeButton() {
     var b = $('btn-challenge');
     if (!b) return;
@@ -1711,6 +1719,7 @@
     bindToolbar();
     bindServerButton();
     bindChallengeButton();
+    bindPrintButton();
     bindKeys();
 
     Project.on('change', function (info) {

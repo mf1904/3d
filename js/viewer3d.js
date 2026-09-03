@@ -32,11 +32,27 @@
     sel: 0x2f6da8
   };
 
+  /* Palet cetak: latar putih, tanah abu sangat muda, grid tipis. Model
+   * tetap berwarna aslinya — yang diganti hanya lingkungannya, supaya
+   * gambar yang keluar terbaca di atas kertas. */
+  var PRINT_COLORS = {
+    bg: 0xffffff,
+    ground: 0xf2f4f7,
+    grid1: 0xc4ccd6,
+    grid2: 0xdde3ea
+  };
+  var printMode = false;
+  function pal() { return printMode ? PRINT_COLORS : COLORS; }
+
   /* ------------------------------------------------------------------ */
   function init(canvasId) {
     canvas = document.getElementById(canvasId);
 
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    // preserveDrawingBuffer: tanpa ini toDataURL bisa mengembalikan gambar
+    // kosong, karena buffer sudah dibersihkan setelah frame selesai disusun.
+    renderer = new THREE.WebGLRenderer({
+      canvas: canvas, antialias: true, alpha: false, preserveDrawingBuffer: true
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(COLORS.bg, 1);
 
@@ -86,12 +102,15 @@
     loop();
   }
 
+  var gridSizeM = 60;   // ukuran grid terakhir, untuk dibangun ulang saat palet berganti
+
   function buildGrid(sizeM) {
+    gridSizeM = sizeM;
     if (gridHelper) { scene.remove(gridHelper); gridHelper.geometry.dispose(); }
     var step = 1;
     while (sizeM / step > 80) step *= 10;
     var divisions = Math.max(4, Math.round(sizeM / step));
-    gridHelper = new THREE.GridHelper(divisions * step, divisions, COLORS.grid1, COLORS.grid2);
+    gridHelper = new THREE.GridHelper(divisions * step, divisions, pal().grid1, pal().grid2);
     gridHelper.position.y = 0;
     gridHelper.userData.noExport = true;
     if (gridHelper.material) {
@@ -100,8 +119,11 @@
     }
     scene.add(gridHelper);
     ground.scale.set(divisions * step * 2.2, divisions * step * 2.2, 1);
-    scene.fog.near = sizeM * 3;
-    scene.fog.far = sizeM * 14;
+    // kabut dimatikan saat mode cetak — jangkauannya tidak perlu disetel
+    if (scene.fog) {
+      scene.fog.near = sizeM * 3;
+      scene.fog.far = sizeM * 14;
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -317,7 +339,7 @@
 
     ctx = c.getContext('2d');
     ctx.font = 'bold ' + fs + 'px "Segoe UI", sans-serif';
-    ctx.fillStyle = 'rgba(12,16,22,0.82)';
+    ctx.fillStyle = printMode ? 'rgba(255,255,255,0.92)' : 'rgba(12,16,22,0.82)';
     var r = 10;
     ctx.beginPath();
     ctx.moveTo(r, 0); ctx.lineTo(w - r, 0); ctx.quadraticCurveTo(w, 0, w, r);
@@ -325,8 +347,15 @@
     ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h - r);
     ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
     ctx.fill();
+    if (printMode) {
+      ctx.strokeStyle = 'rgba(27,33,41,0.35)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
 
-    ctx.fillStyle = accent ? '#ffd479' : '#e6edf5';
+    ctx.fillStyle = printMode
+      ? (accent ? '#8a6410' : '#1b2129')
+      : (accent ? '#ffd479' : '#e6edf5');
     ctx.textBaseline = 'middle';
     ctx.fillText(text, pad, h / 2 + 2);
 
@@ -658,7 +687,86 @@
     return out;
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* snapshot untuk cetak / simpan gambar                                */
+  /*                                                                     */
+  /* Yang diganti hanya LINGKUNGANNYA — latar, tanah, grid, dan pil      */
+  /* label. Warna modelnya dibiarkan apa adanya: itu keputusan desain    */
+  /* penggunanya, bukan sesuatu yang boleh diubah diam-diam saat cetak.  */
+  /*                                                                     */
+  /* Kabut ikut dimatikan. Kabut gelap dipakai untuk memberi kedalaman   */
+  /* di layar; di atas kertas putih ia hanya membuat bagian jauh pudar   */
+  /* jadi kelabu kotor.                                                  */
+  /* ------------------------------------------------------------------ */
+  function snapshot(opts) {
+    opts = opts || {};
+    if (!renderer || !canvas) return null;
+
+    var W = Math.max(200, Math.round(opts.width || 2000));
+    var H = Math.max(200, Math.round(opts.height || 1400));
+
+    var simpan = {
+      size: renderer.getSize(new THREE.Vector2()),
+      pixelRatio: renderer.getPixelRatio(),
+      aspect: camera.aspect,
+      fog: scene.fog,
+      gridVisible: gridHelper ? gridHelper.visible : true,
+      groundColor: ground.material.color.getHex(),
+      radius: ctrl.radius,
+      theta: ctrl.theta,
+      phi: ctrl.phi,
+      target: ctrl.target.clone()
+    };
+
+    try {
+      printMode = true;
+
+      renderer.setPixelRatio(1);          // W/H sudah dalam piksel akhir
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      camera.updateProjectionMatrix();
+
+      renderer.setClearColor(PRINT_COLORS.bg, 1);
+      scene.fog = null;
+      ground.material.color.setHex(PRINT_COLORS.ground);
+      buildGrid(gridSizeM);                     // bangun ulang dengan warna cetak
+      if (gridHelper) gridHelper.visible = opts.grid !== false && simpan.gridVisible;
+
+      rebuildLabels();                    // tekstur pil harus digambar ulang
+      if (opts.fit !== false) fit(opts.ids);
+      scaleLabels();
+
+      renderer.render(scene, camera);
+      return renderer.domElement.toDataURL('image/png');
+    } finally {
+      printMode = false;
+
+      renderer.setClearColor(COLORS.bg, 1);
+      scene.fog = simpan.fog;
+      ground.material.color.setHex(simpan.groundColor);
+      buildGrid(gridSizeM);                     // kembali ke warna layar
+      if (gridHelper) gridHelper.visible = simpan.gridVisible;
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(simpan.size.x, simpan.size.y, false);
+      camera.aspect = simpan.aspect;
+      camera.updateProjectionMatrix();
+
+      ctrl.radius = simpan.radius;
+      ctrl.theta = simpan.theta;
+      ctrl.phi = simpan.phi;
+      ctrl.target.copy(simpan.target);
+
+      rebuildLabels();
+      applyCamera();
+      resize();
+      needsRender = true;
+    }
+  }
+
   global.Viewer3D = {
+    snapshot: snapshot,
     init: init,
     resize: resize,
     rebuild: rebuild,

@@ -829,3 +829,54 @@ dipakai — itu yang resmi.
 Penjurian dan voting (poin 8 bagian "judging") belum dibuat: belum ada skor,
 peringkat, mode anonim, maupun peran juri. Galeri sekarang menampilkan angka
 kepatuhan apa adanya, dan penilaian dilakukan manusia di luar aplikasi.
+
+---
+
+## Cetak & simpan gambar
+
+Tombol **Cetak Gambar** di toolbar menghasilkan denah 2D dan/atau tampak 3D
+dengan **latar putih siap kertas**, lalu mencetaknya atau menyimpannya sebagai
+PNG.
+
+Yang keluar **bukan tangkapan layar**. Editor memakai latar gelap karena enak
+dipandang berjam-jam; mencetak layar gelap apa adanya menghabiskan tinta, dan
+garis tipis yang jelas di layar justru hilang begitu dibalik jadi hitam di atas
+putih. Jadi isinya digambar ulang dengan palet terang, pada ukuran cetak,
+sebelum dipotret:
+
+| | Di layar | Saat dicetak |
+|---|---|---|
+| Latar | gelap | putih |
+| Grid | biru tua | abu sangat muda |
+| Nama objek | teks terang, bayangan gelap | teks gelap, pil putih bergaris tepi |
+| Tanah 3D | abu gelap | abu muda |
+| Kabut 3D | aktif (memberi kedalaman) | mati (di kertas hanya bikin kelabu kotor) |
+| Kotak seleksi, pegangan resize | tampil | tidak ikut |
+
+Warna objeknya sendiri **tidak diubah** — itu keputusan desain penggunanya,
+bukan sesuatu yang boleh diganti diam-diam saat cetak.
+
+### Pilihan
+
+- **Yang dicetak** — Denah 2D, Tampak 3D, atau keduanya (masing-masing satu halaman)
+- **Orientasi kertas** — mendatar atau tegak (A4, margin 12 mm)
+- **Sertakan grid** — matikan kalau ingin gambar bersih; setelan grid di editor tidak ikut berubah
+
+Nama project, satuan, luasan, jumlah objek, dan tanggal ikut tercetak sebagai
+kepala dan kaki halaman, supaya lembar cetaknya bisa dibaca berdiri sendiri.
+
+### Catatan teknis
+
+Gambar dibuat pada 2200 px di sisi panjang — sekitar 190 dpi pada A4, tajam
+untuk garis denah tanpa membengkakkan berkas.
+
+Mencetak lewat `<iframe>` tersembunyi, bukan `window.open`: popup diblokir
+diam-diam di banyak peramban, dan pengguna hanya akan melihat tombol yang tidak
+melakukan apa-apa. Dialog cetak baru dibuka setelah semua gambar benar-benar
+selesai dimuat — kalau tidak, yang tercetak halaman kosong.
+
+Halaman cetak memakai `print-color-adjust: exact`. Tanpa itu sebagian peramban
+"menghemat" dengan membuang latar dan warna isian, dan yang keluar cuma garis.
+
+Setelah memotret, ukuran kanvas, zoom, posisi pandang, seleksi, dan kamera 3D
+dikembalikan persis seperti sebelumnya.

@@ -96,6 +96,29 @@
     rebuild();
     drawGrid();
   }
+  /* ------------------------------------------------------------------ */
+  /* palet: layar gelap vs cetak di atas kertas putih                    */
+  /*                                                                     */
+  /* Warna layar dipilih untuk latar gelap — teks nyaris putih, grid biru
+   * tua. Di atas kertas putih teks itu hilang sama sekali dan grid jadi
+   * garis hitam yang lebih menonjol daripada bangunannya. Jadi cetak
+   * memakai palet sendiri, bukan sekadar mengganti latar.                */
+  /* ------------------------------------------------------------------ */
+  var printMode = false;
+  var PALET = {
+    layar: {
+      gridMinor: '#232c37', gridMajor: '#31404f', gridAxis: '#4a6274',
+      gridText: '#54677c', label: '#dfe8f2', labelShadow: '#0b0e12',
+      group: '#ffd479', groupShadow: '#0b0e12'
+    },
+    cetak: {
+      gridMinor: '#eceff3', gridMajor: '#d5dde5', gridAxis: '#9aa8b6',
+      gridText: '#78869a', label: '#1b2129', labelShadow: '#ffffff',
+      group: '#8a6410', groupShadow: '#ffffff'
+    }
+  };
+  function pal() { return printMode ? PALET.cetak : PALET.layar; }
+
 
   /* ------------------------------------------------------------------ */
   /* grid                                                               */
@@ -125,7 +148,8 @@
     var ny = Math.min(maxLines, Math.ceil((br.y - y0) / stepU) + 1);
     var i, v, major, isAxis;
 
-    var COL_MINOR = '#232c37', COL_MAJOR = '#31404f', COL_AXIS = '#4a6274';
+    var P = pal();
+    var COL_MINOR = P.gridMinor, COL_MAJOR = P.gridMajor, COL_AXIS = P.gridAxis;
 
     for (i = 0; i <= nx; i++) {
       v = x0 + i * stepU;
@@ -171,7 +195,7 @@
       text: text,
       fontSize: 10,
       fontFamily: 'Segoe UI, sans-serif',
-      fill: '#54677c',
+      fill: pal().gridText,
       scaleX: 1 / s,
       scaleY: 1 / s,
       listening: false
@@ -352,6 +376,7 @@
     } else {
       t.text(txt);
     }
+    t.fill(pal().label); t.shadowColor(pal().labelShadow);
     t.visible(true);
     t.scaleX(1 / s); t.scaleY(1 / s);
     t.offsetX(t.width() / 2);
@@ -410,6 +435,7 @@
         groupLabels[gid] = t;
         overlayLayer.add(t);
       }
+      t.fill(pal().group); t.shadowColor(pal().groupShadow);
       t.text(info.name);
       t.visible(b.w * s > 40);
       t.scaleX(1 / s); t.scaleY(1 / s);
@@ -1445,7 +1471,88 @@
     if (stage) stage.container().style.cursor = down ? 'grab' : 'default';
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* snapshot untuk cetak / simpan gambar                                */
+  /*                                                                     */
+  /* Bukan sekadar memotret kanvas apa adanya: kanvas layar berukuran    */
+  /* sebesar pane (sering sempit dan beraspek aneh), latarnya gelap, dan */
+  /* di atasnya ada perkakas sunting — kotak seleksi, pegangan resize,   */
+  /* rubber band. Semua itu tidak ada urusannya dengan gambar cetak.     */
+  /*                                                                     */
+  /* Jadi stage sementara dibesarkan ke ukuran cetak, dipaskan ke isi,   */
+  /* dipindah ke palet terang di atas alas putih, dipotret, lalu semua   */
+  /* dikembalikan persis seperti semula.                                 */
+  /* ------------------------------------------------------------------ */
+  function snapshot(opts) {
+    opts = opts || {};
+    if (!stage) return null;
+
+    var W = Math.max(200, Math.round(opts.width || 2000));
+    var H = Math.max(200, Math.round(opts.height || 1400));
+
+    var simpan = {
+      w: stage.width(), h: stage.height(),
+      scale: stage.scaleX(), pos: stage.position(),
+      zoom: zoom,
+      seleksi: Project.selection,
+      gridShow: Project.state.grid.show
+    };
+
+    var alas = null;
+    try {
+      printMode = true;
+      if (opts.grid === false) Project.state.grid.show = false;
+
+      // kosongkan seleksi supaya transformer & rubber band tidak ikut terpotret
+      Project.setSelection([]);
+      if (rubber) rubber.visible(false);
+
+      stage.width(W);
+      stage.height(H);
+      fit(opts.ids);
+      drawGridNow();          // fit() menjadwalkan lewat rAF; potret butuh sekarang
+
+      // alas putih seluas viewport, dalam koordinat dunia
+      var tl = screenToWorld(0, 0);
+      var br = screenToWorld(W, H);
+      alas = new Konva.Rect({
+        x: tl.x, y: tl.y,
+        width: br.x - tl.x, height: br.y - tl.y,
+        fill: '#ffffff', listening: false
+      });
+      gridLayer.add(alas);
+      alas.moveToBottom();
+
+      gridLayer.draw();
+      shapeLayer.draw();
+      overlayLayer.draw();
+
+      return stage.toDataURL({
+        mimeType: 'image/png',
+        pixelRatio: opts.pixelRatio || 1
+      });
+    } finally {
+      if (alas) alas.destroy();
+      printMode = false;
+      Project.state.grid.show = simpan.gridShow;
+      if (rubber) rubber.visible(true);
+
+      stage.width(simpan.w);
+      stage.height(simpan.h);
+      zoom = simpan.zoom;
+      stage.scale({ x: simpan.scale, y: simpan.scale });
+      stage.position(simpan.pos);
+      Project.setSelection(simpan.seleksi);
+
+      drawGridNow();
+      refreshLabels();
+      stage.batchDraw();
+    }
+  }
+
   global.Editor2D = {
+    snapshot: snapshot,
     init: init,
     resize: resize,
     rebuild: rebuild,

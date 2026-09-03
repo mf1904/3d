@@ -51,6 +51,14 @@ const STATIC_OPTS = {
 for (const dir of ['css', 'js', 'vendor']) {
   app.use('/' + dir, express.static(path.join(APP_DIR, dir), STATIC_OPTS));
 }
+/* Galeri challenge dilayani sebagai halaman tersendiri, bukan bagian dari
+ * editor: pengunjung galeri belum tentu ingin memuat Konva + Three.js.
+ * Slug-nya diurus di klien lewat path, jadi satu berkas melayani semua. */
+app.get(['/c', '/c/:slug'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(APP_DIR, 'challenge.html'));
+});
+
 app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(APP_DIR, 'index.html'));
@@ -129,6 +137,10 @@ app.delete('/api/projects/:id', auth.requireAuth, (req, res) => {
   }
   res.json({ ok: true });
 });
+
+/* -------------------------------------------------------- challenge ---- */
+
+require('./routes-challenge')(app);
 
 /* ------------------------------------------------------------ fallback -- */
 

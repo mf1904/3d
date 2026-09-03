@@ -1023,6 +1023,11 @@
     var b = $('btn-server');
     var st = API.state;
     b.hidden = !st.available;
+
+    // Membuat challenge memakai sesi admin yang sama, jadi tombolnya baru
+    // masuk akal setelah login — sebelum itu cuma bikin bingung.
+    var cb = $('btn-challenge');
+    if (cb) cb.hidden = !(st.available && st.configured && st.authed);
     if (!st.available) return;
     if (!st.configured) {
       b.textContent = 'Server: belum disetel';
@@ -1073,6 +1078,15 @@
         });
       }
     });
+  }
+
+  function bindChallengeButton() {
+    var b = $('btn-challenge');
+    if (!b) return;
+    b.onclick = function () {
+      if (typeof Challenge === 'undefined') return;
+      Challenge.buatDialog();
+    };
   }
 
   function bindServerButton() {
@@ -1696,6 +1710,7 @@
     bindProps();
     bindToolbar();
     bindServerButton();
+    bindChallengeButton();
     bindKeys();
 
     Project.on('change', function (info) {

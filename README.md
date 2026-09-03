@@ -735,3 +735,97 @@ Untuk Apache/cPanel cukup unggah ke document root subdomain; tidak perlu
 Endpoint API dipanggil dengan path **relatif** (`api/projects`, bukan
 `/api/projects`), jadi sifat portabel di atas tetap terjaga walau aplikasinya
 dipasang di dalam sub-folder.
+
+---
+
+## Design challenge
+
+Mode kompetisi desain: admin menyiapkan **template** (biasanya bidang tanah dan
+konteks sekitarnya, tanpa bangunan), peserta merancang di dalamnya memakai
+editor yang sama, lalu mengirim karyanya ke **galeri publik**.
+
+### Tiga peran, tanpa akun
+
+Backend ini sejak awal satu-password-untuk-satu-orang. Mode challenge butuh
+banyak peserta yang masing-masing hanya boleh menyunting karyanya sendiri —
+kalau dijawab dengan tabel user, ikut terseret registrasi, verifikasi email,
+lupa password, dan moderasi. Itu proyek tersendiri.
+
+Yang dipakai sebagai gantinya: **kapabilitas berbentuk tautan**.
+
+| Peran | Cara masuk | Boleh apa |
+|---|---|---|
+| Admin | password server yang sudah ada | bikin/tutup/hapus challenge, terbitkan undangan, sunting & hapus karya siapa pun |
+| Peserta baru | `/?c=<slug>&k=<undangan>` | memuat template, merancang, mengirim karya |
+| Peserta lama | `/?s=<slug>/<id>&e=<sunting>` | membuka karyanya sendiri dan memperbaruinya |
+| Siapa saja | `/c/<slug>` dan `/?view=<slug>/<id>` | melihat brief, galeri, dan karya peserta |
+
+Token disimpan di server sebagai **hash SHA-256**, bukan apa adanya — backup
+atau log yang bocor tidak langsung memberi hak sunting. Konsekuensinya jujur
+saja: token tidak bisa ditampilkan ulang. Peserta yang kehilangan tautannya
+minta admin menerbitkan yang baru; menerbitkan undangan baru **mematikan yang
+lama**.
+
+Batasnya juga jujur: siapa pun yang dikirimi tautan sunting bisa ikut
+menyunting karya itu. Untuk kompetisi berhadiah besar, ini kurang; untuk
+latihan desain internal, ini pas.
+
+### Membuat challenge
+
+1. Login ke server (tombol **Server**), lalu susun project template — tarik
+   **Bidang Tanah**, atur ukurannya, tambahkan konteks kalau perlu.
+2. Klik **Challenge** di toolbar (hanya muncul setelah login).
+3. Isi judul, brief, dan batasannya. Dialog langsung memberi **tautan
+   undangan** (untuk peserta) dan **tautan galeri** (publik).
+
+Panel admin di halaman galeri bisa menutup/membuka challenge dan menerbitkan
+tautan undangan baru.
+
+### Batasan yang diperiksa
+
+| Batasan | Arti |
+|---|---|
+| **KDB maks** | luas tapak bangunan ÷ luas tanah, dalam persen |
+| **Tinggi maks** | puncak tertinggi (elevasi + tinggi) |
+| **Objek maks** | jumlah objek bangunan |
+| **Batas tanah** | selalu berlaku — semua bangunan harus di dalam poligon tanah |
+
+Bar challenge di atas kanvas menampilkan status ini **sambil menggambar**;
+arahkan kursor ke sana untuk melihat rinciannya.
+
+Luas terbangun dihitung sebagai **gabungan**, bukan penjumlahan. Menjumlah luas
+tiap objek salah begitu ada dua massa yang bertumpuk sebagian (badan + teras,
+atau atap yang lebih lebar dari badannya): satu meter persegi tanah yang sama
+terhitung dua kali dan peserta terlihat melanggar KDB padahal tidak.
+Gabungannya dihitung dengan raster 600 sel pada sisi terpanjang — untuk tanah
+100 m, galat tepinya sekitar 17 cm.
+
+Tapak yang menjorok keluar tanah tidak menaikkan KDB; pelanggarannya diurus
+aturan batas tanah, bukan dihitung dua kali.
+
+### Satu implementasi untuk dua sisi
+
+`js/evaluate.js` dipakai **editor dan server sekaligus** — server memuatnya
+lewat `vm` (lihat `server/geom.js`). Kalau logikanya disalin, kedua salinan
+pasti berbeda pelan-pelan, dan peserta akan melihat "memenuhi brief" di editor
+lalu ditolak saat mengirim.
+
+Angka yang **disimpan** selalu hasil hitungan server. Klien menghitung hanya
+untuk umpan balik seketika; laporan yang dikirim klien diabaikan.
+
+### Autosave saat mode challenge
+
+Membuka tautan challenge **tidak** menyentuh autosave project pribadi: mode
+challenge menulis ke kunci tersendiri (`layout3d:autosave:c:<slug>`). Tanpa
+pemisahan ini, satu klik pada tautan undangan akan menimpa gambar pribadi
+pengguna, dan penyebabnya mustahil ditebak.
+
+Peserta yang me-refresh di tengah menggambar akan menemukan drafnya kembali,
+bukan template kosong. Untuk karya yang sudah terkirim, versi server yang
+dipakai — itu yang resmi.
+
+### Yang belum ada
+
+Penjurian dan voting (poin 8 bagian "judging") belum dibuat: belum ada skor,
+peringkat, mode anonim, maupun peran juri. Galeri sekarang menampilkan angka
+kepatuhan apa adanya, dan penilaian dilakukan manusia di luar aplikasi.

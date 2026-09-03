@@ -15,6 +15,11 @@
   'use strict';
 
   var KEY_AUTOSAVE = 'layout3d:autosave';
+
+  /* Kunci autosave yang SEDANG dipakai. Mode challenge menggantinya dengan
+   * kunci tersendiri: membuka tautan undangan tidak boleh menimpa project
+   * pribadi yang kebetulan tersimpan di browser yang sama. */
+  var autosaveKey = KEY_AUTOSAVE;
   var KEY_PROJECTS = 'layout3d:projects';
   var HISTORY_MAX = 60;
 
@@ -455,7 +460,7 @@
   /** tulis sekarang juga; mengembalikan true kalau berhasil */
   function writeAutosave() {
     try {
-      localStorage.setItem(KEY_AUTOSAVE, JSON.stringify(state));
+      localStorage.setItem(autosaveKey, JSON.stringify(state));
       autosaveBroken = false;
       emit('autosave', { ok: true, at: Date.now() });
       return true;
@@ -500,9 +505,23 @@
     });
   }
 
+  /**
+   * Alihkan autosave ke kunci lain (mode challenge). suffix kosong =
+   * kembali ke project pribadi.
+   */
+  function setAutosaveKey(suffix) {
+    autosaveKey = suffix ? KEY_AUTOSAVE + ':' + suffix : KEY_AUTOSAVE;
+  }
+
+  /** ada draf tersimpan di kunci yang sedang aktif? */
+  function hasAutosave() {
+    try { return !!localStorage.getItem(autosaveKey); }
+    catch (e) { return false; }
+  }
+
   function restoreAutosave() {
     try {
-      var raw = localStorage.getItem(KEY_AUTOSAVE);
+      var raw = localStorage.getItem(autosaveKey);
       if (!raw) return false;
       load(JSON.parse(raw), { nohistory: true });
       undoStack.length = 0; redoStack.length = 0;
@@ -567,6 +586,8 @@
     canRedo: function () { return redoStack.length > 0; },
     serialize: serialize, load: load, reset: reset, sanitize: sanitize,
     restoreAutosave: restoreAutosave,
+    setAutosaveKey: setAutosaveKey,
+    hasAutosave: hasAutosave,
     flushAutosave: flushAutosave,
     autosaveBroken: function () { return autosaveBroken; },
     listSaved: listSaved, saveNamed: saveNamed, loadNamed: loadNamed, deleteNamed: deleteNamed

@@ -1,0 +1,277 @@
+/* layout3d — halaman galeri challenge
+ *
+ * Memakai variabel warna dari style.css, tapi tata letaknya berbeda jauh dari
+ * editor: editor adalah aplikasi satu layar tanpa scroll, galeri adalah
+ * halaman dokumen biasa yang di-scroll. Jadi body-nya di-reset di sini.
+ */
+
+body.gallery {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.55 system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ------------------------------------------------------------- rangka -- */
+
+.g-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  height: var(--tb-h);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.g-top .logo { text-decoration: none; color: var(--fg); font-size: 15px; letter-spacing: .2px; }
+.g-top .logo b { color: var(--accent); }
+.g-nav { display: flex; gap: 14px; }
+.g-nav a { color: var(--fg-dim); text-decoration: none; }
+.g-nav a:hover { color: var(--fg); }
+
+#g-main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+.g-foot {
+  border-top: 1px solid var(--line);
+  color: var(--fg-mute);
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.g-loading, .g-empty { color: var(--fg-mute); padding: 40px 0; text-align: center; }
+.g-error {
+  background: rgba(226, 86, 74, .12);
+  border: 1px solid var(--danger);
+  color: #ffb4ad;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 20px 0;
+}
+
+/* -------------------------------------------------------------- brief -- */
+
+.g-head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+.g-head .g-sub { color: var(--fg-mute); margin-bottom: 14px; }
+.g-brief {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  white-space: pre-wrap;
+}
+
+.g-rules { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.g-rule {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  color: var(--fg-dim);
+}
+.g-rule b { color: var(--fg); font-weight: 600; }
+
+.g-cta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 26px; }
+.g-btn {
+  display: inline-block;
+  background: var(--accent-2);
+  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 7px 16px;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+}
+.g-btn:hover { background: var(--accent); }
+.g-btn.ghost { background: transparent; color: var(--fg-dim); border-color: var(--line-2); }
+.g-btn.ghost:hover { color: var(--fg); border-color: var(--fg-mute); }
+
+.g-tag {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  border: 1px solid;
+}
+.g-tag.open { color: var(--ok); border-color: rgba(73, 192, 125, .5); background: rgba(73, 192, 125, .1); }
+.g-tag.closed { color: var(--fg-mute); border-color: var(--line-2); }
+
+/* -------------------------------------------------------------- kartu -- */
+
+.g-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.g-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  transition: border-color .12s;
+}
+.g-card:hover { border-color: var(--line-2); }
+
+.g-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+.g-card-body { padding: 10px 12px 12px; }
+.g-card-body h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+.g-card-body .g-meta { color: var(--fg-mute); font-size: 12px; }
+.g-card-body .g-note { color: var(--fg-dim); margin-top: 6px; }
+
+.g-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.g-badge {
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  border: 1px solid;
+}
+.g-badge.ok { color: var(--ok); border-color: rgba(73, 192, 125, .45); background: rgba(73, 192, 125, .08); }
+.g-badge.bad { color: #ffb4ad; border-color: rgba(226, 86, 74, .5); background: rgba(226, 86, 74, .1); }
+.g-badge.num { color: var(--fg-dim); border-color: var(--line-2); }
+
+/* -------------------------------------------------------------- admin -- */
+
+.g-admin {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.g-admin h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--fg-dim); }
+.g-admin .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.g-link {
+  flex: 1 1 320px;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--fg);
+  font: 12px/1.4 ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+@media (max-width: 600px) {
+  #g-main { padding: 16px 14px 40px; }
+  .g-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g-head h1 { font-size: 19px; }
+}
+
+/* ======================================================================== */
+/* Bar challenge di dalam editor                                            */
+/*                                                                          */
+/* Ditempatkan sebagai baris tersendiri antara toolbar dan #main, bukan     */
+/* diselipkan ke toolbar: toolbar sudah padat, dan status kepatuhan perlu   */
+/* terbaca sekilas tanpa bersaing dengan tombol.                            */
+/* ======================================================================== */
+
+#ch-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 12px;
+  height: 36px;
+  background: linear-gradient(var(--bg-3), var(--bg-2));
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+#ch-bar .ch-left, #ch-bar .ch-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+#ch-bar .ch-kicker {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: .8px;
+  color: var(--accent);
+  border: 1px solid rgba(77, 163, 255, .4);
+  border-radius: 3px;
+  padding: 1px 6px;
+  flex: 0 0 auto;
+}
+#ch-bar .ch-title {
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#ch-bar .ch-title:hover { text-decoration: underline; }
+#ch-bar .ch-rules {
+  color: var(--fg-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#ch-bar .ch-status {
+  border-radius: 4px;
+  padding: 2px 9px;
+  border: 1px solid var(--line-2);
+  color: var(--fg-dim);
+  white-space: nowrap;
+  cursor: help;
+}
+#ch-bar .ch-status.ok { color: var(--ok); border-color: rgba(73, 192, 125, .45); background: rgba(73, 192, 125, .1); }
+#ch-bar .ch-status.bad { color: #ffb4ad; border-color: rgba(226, 86, 74, .5); background: rgba(226, 86, 74, .12); }
+#ch-bar .ch-warn { color: #ffb4ad; }
+#ch-bar .ch-note { color: var(--fg-mute); }
+
+/* dialog challenge di editor */
+.ch-err { color: var(--danger); font-size: 11.5px; min-height: 15px; margin-top: 6px; }
+.ch-hint { color: var(--fg-mute); font-size: 11.5px; margin-top: 8px; line-height: 1.5; }
+.ch-viol {
+  background: rgba(226, 86, 74, .1);
+  border: 1px solid rgba(226, 86, 74, .4);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 12px 0 4px;
+}
+.ch-viol ul { margin: 6px 0 6px 18px; padding: 0; }
+.ch-viol p { margin: 6px 0 0; color: var(--fg-dim); font-size: 11.5px; }
+.cc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+
+@media (max-width: 900px) {
+  #ch-bar .ch-rules { display: none; }
+}
+
+/* style.css memberi gaya pada input[type=text|number|password] di modal, tapi
+   belum pernah ada textarea di sana sebelum brief challenge. Tanpa ini ia
+   memakai gaya bawaan peramban: latar putih di tengah dialog gelap. */
+#modal-body textarea {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: 12.5px/1.5 inherit;
+  font-family: inherit;
+  margin-bottom: 10px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+#modal-body textarea:focus,
+#modal-body input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }

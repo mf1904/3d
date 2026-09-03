@@ -16,15 +16,33 @@
     Project.setSelection([]);
   }
 
+  // ukuran pane belum pasti saat boot, dan bar challenge menggeser tinggi
+  // kanvas — jadi fit selalu ditunda sampai layout mengendap.
+  function fitSoon() {
+    setTimeout(function () {
+      Editor2D.resize();
+      Viewer3D.resize();
+      Editor2D.fit();
+      Viewer3D.fit();
+    }, 80);
+  }
+
   function boot() {
     if (typeof Konva === 'undefined') return fail('Konva.js tidak termuat.');
     if (typeof THREE === 'undefined') return fail('Three.js tidak termuat.');
 
     document.body.setAttribute('data-view', 'split');
 
+    // Tautan challenge menentukan isi kanvas, bukan autosave: peserta yang
+    // membuka undangan ingin mengerjakan challenge itu, bukan melanjutkan
+    // project pribadinya yang kebetulan tersimpan di browser yang sama.
+    var inChallenge = (typeof Challenge !== 'undefined') && Challenge.detect();
+
     var restored = false;
-    try { restored = Project.restoreAutosave(); }
-    catch (e) { console.warn('[layout3d] restore gagal:', e); }
+    if (!inChallenge) {
+      try { restored = Project.restoreAutosave(); }
+      catch (e) { console.warn('[layout3d] restore gagal:', e); }
+    }
 
     try {
       Editor2D.init('stage-2d');
@@ -34,7 +52,12 @@
       return fail('Gagal inisialisasi: ' + e.message);
     }
 
-    if (!restored || !Project.shapes.length) {
+    if (inChallenge) {
+      Challenge.load().then(function (ok) {
+        if (!ok) seedDemo();
+        fitSoon();
+      });
+    } else if (!restored || !Project.shapes.length) {
       seedDemo();
       UI.say('Contoh "Rumah" dimuat. Klik item di panel kiri untuk menambah objek.');
     } else {
@@ -42,13 +65,7 @@
     }
 
     UI.syncToolbarFromProject();
-    // tunggu layout final dulu, baru fit (ukuran pane belum pasti saat boot)
-    setTimeout(function () {
-      Editor2D.resize();
-      Viewer3D.resize();
-      Editor2D.fit();
-      Viewer3D.fit();
-    }, 80);
+    fitSoon();
 
     // resize responsif
     var ro = null;

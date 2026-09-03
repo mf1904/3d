@@ -379,17 +379,45 @@ Sekalian diperbaiki: roda mouse dulu dipetakan ke zoom, sekarang ke geser
 (Shift = mendatar, Ctrl = zoom) mengikuti Photoshop — roda-sebagai-zoom bikin
 kanvas besar susah dijelajah.
 
-### Poin 8 — Design challenge: BELUM dimulai
+### Poin 8 — Design challenge: SELESAI untuk lingkup MVP (3 September 2026)
 
-Satu hal yang perlu diputuskan sebelum ini dikerjakan: **arsitektur auth-nya
-bertabrakan dengan keputusan yang sudah diambil.** Backend sekarang sengaja
-dibuat satu-password-untuk-satu-orang (jawaban "dipakai sendiri saja"), tanpa
-tabel user, tanpa registrasi.
+Lingkup yang disebut rencana sebagai MVP — **template + submission + gallery** —
+sudah jalan. Penjurian/voting memang ditulis "v2, belum MVP" dan belum dibuat.
 
-Mode challenge butuh yang sebaliknya: banyak peserta, masing-masing punya akun
-dan hanya boleh menyunting submission miliknya sendiri, plus peran admin dan
-(nanti) juri. Itu bukan penambahan kecil di atas yang ada — itu mengganti
-fondasi autentikasinya, dan menyeret konsekuensi lain: registrasi, reset
-password, moderasi, dan gallery publik yang bisa diakses tanpa login.
+**Soal auth yang tadinya mengganjal, diselesaikan tanpa mengganti fondasi.**
+Catatan sebelumnya benar bahwa menambah tabel user akan menyeret registrasi,
+reset password, dan moderasi. Yang dipakai sebagai gantinya: kapabilitas
+berbentuk tautan. Admin tetap satu password (sesi yang sudah ada), peserta
+memegang token undangan untuk mengirim, dan tiap karya punya token suntingnya
+sendiri. Tidak ada akun sama sekali, tapi jaminannya sama: seorang peserta
+hanya bisa menyunting karyanya sendiri.
 
-Jadi poin 8 realistis dikerjakan sebagai fase tersendiri, bukan tempelan.
+Token disimpan sebagai hash SHA-256 dan dibandingkan waktu-tetap. Batas yang
+harus diakui: siapa pun yang dikirimi tautan sunting ikut bisa menyunting, dan
+tautan yang hilang hanya bisa dipulihkan admin dengan menerbitkan yang baru.
+
+Yang dibuat:
+- `server/challenges.js` — penyimpanan challenge & submission (file JSON, tulis atomik)
+- `server/routes-challenge.js` — rute publik/undangan/sunting/admin
+- `server/geom.js` — memuat kode geometri frontend lewat `vm`
+- `js/evaluate.js` — penilaian constraint, DIPAKAI BERSAMA klien dan server
+- `js/challenge.js` — bar challenge, kirim/perbarui, dialog admin
+- `js/gallery.js` + `challenge.html` + `css/challenge.css` — galeri publik
+
+Constraint yang diperiksa: KDB maks, tinggi maks, jumlah objek maks, dan
+"semua bangunan di dalam batas tanah" (selalu). Luas terbangun dihitung sebagai
+gabungan lewat raster, bukan penjumlahan — dua massa yang bertumpuk sebagian
+tidak lagi terhitung dua kali.
+
+Angka yang disimpan selalu hasil hitungan server; laporan kiriman klien
+diabaikan. Karena kodenya satu berkas yang sama, angka di editor dan di galeri
+tidak pernah berbeda.
+
+Sekalian diperbaiki dua hal yang muncul saat pengujian:
+- `challenge.html` disajikan di `/c/<slug>`, jadi path aset relatifnya
+  diselesaikan ke `/c/css/...` dan gagal — sekarang absolut.
+- Mode challenge dulu menulis autosave ke kunci yang sama dengan project
+  pribadi, jadi satu klik pada tautan undangan menimpa gambar pengguna.
+  Sekarang tiap challenge punya kunci autosave sendiri.
+
+Belum ada: skor, peringkat, penjurian anonim, peran juri, voting publik.

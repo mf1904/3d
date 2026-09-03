@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Challenge — layout3d</title>
+<!-- Path aset ABSOLUT, bukan relatif: halaman ini disajikan di /c/<slug>,
+     jadi "css/style.css" akan diselesaikan peramban ke /c/css/style.css. -->
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/challenge.css">
+</head>
+<body class="gallery">
+
+<header class="g-top">
+  <a class="logo" href="/">layout<b>3d</b></a>
+  <nav class="g-nav">
+    <a href="/c">Semua challenge</a>
+    <a href="/">Buka editor</a>
+  </nav>
+</header>
+
+<main id="g-main">
+  <p class="g-loading">Memuat…</p>
+</main>
+
+<footer class="g-foot">
+  <span>Dibuat dengan layout3d — denah 2D, model 3D, dan STL siap cetak.</span>
+</footer>
+
+<!-- Konva dan Three.js sengaja TIDAK dimuat di sini: galeri hanya perlu
+     menggambar denah datar, dan itu cukup dengan canvas 2D biasa. Halaman
+     galeri harus tetap ringan buat pengunjung yang cuma melihat-lihat. -->
+<script src="/js/units.js"></script>
+<script src="/js/shapes.js"></script>
+<script src="/js/gallery.js"></script>
+
+</body>
+</html>

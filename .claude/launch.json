@@ -4,8 +4,20 @@
     {
       "name": "layout3d",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5173"
+      ],
       "port": 5173
+    },
+    {
+      "name": "layout3d-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/dev-server.js"
+      ],
+      "port": 8130
     }
   ]
 }

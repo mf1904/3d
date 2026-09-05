@@ -761,7 +761,116 @@
     }
   }
 
+
+  /* ------------------------------------------------------------------ */
+  /* alas cetak (base plate)                                            */
+  /*                                                                    */
+  /* Miniatur hasil cetak 3D butuh pijakan: tanpa alas, tiap bangunan   */
+  /* jadi potongan lepas yang harus ditempel sendiri, dan bagian tipis  */
+  /* (pohon, tiang, cerobong) gampang lepas dari meja printer.          */
+  /*                                                                    */
+  /* Dibangun dalam METER dunia, dengan permukaan atas tepat di y = 0   */
+  /* supaya model yang sudah ada tinggal duduk di atasnya tanpa digeser.*/
+  /* ------------------------------------------------------------------ */
+  function basePlate(pointsM, thicknessM) {
+    if (!pointsM || pointsM.length < 3) return null;
+    var t = Math.max(1e-4, thicknessM);
+
+    var shape = new THREE.Shape();
+    // konvensi sama dengan polyExtrude: (x, y2d) -> Shape(x, -y2d),
+    // supaya setelah rotateX(-90°) sumbu y2d jatuh tepat ke sumbu z dunia
+    shape.moveTo(pointsM[0][0], -pointsM[0][1]);
+    for (var i = 1; i < pointsM.length; i++) shape.lineTo(pointsM[i][0], -pointsM[i][1]);
+    shape.closePath();
+
+    var g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 6 });
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, -t, 0);        // permukaan atas di y = 0
+    return g;
+  }
+
+  /**
+   * Perbesar poligon ke luar sejauh `marginM` — offset sisi yang sebenarnya.
+   *
+   * Tiap sisi digeser sejauh margin searah normal luarnya, lalu titik sudut
+   * baru = perpotongan dua garis sisi yang sudah digeser. Dengan begitu jarak
+   * tegak lurus dari tiap sisi lama ke sisi barunya tepat `marginM` — berapa
+   * pun bentuknya.
+   *
+   * Cara yang lebih murah (menskala semua titik menjauhi titik berat) meleset
+   * jauh: pada tanah 80 × 60 m, margin 3 mm cetak jadi 2,4 mm di satu sumbu
+   * dan 1,8 mm di sumbu lain. Untuk alas cetak yang salahnya baru ketahuan
+   * setelah berjam-jam nge-print, itu tidak sepadan dengan hematnya.
+   *
+   * Sudut dalam yang dalam dan sempit bisa membuat hasil offset memotong
+   * dirinya sendiri. Kasus itu dideteksi, dan poligon aslinya dikembalikan apa
+   * adanya — alas yang pas-pasan jauh lebih baik daripada alas yang simpul.
+   */
+  function growPolygon(pointsM, marginM) {
+    var n = pointsM.length;
+    if (!marginM || n < 3) return pointsM;
+
+    // arah putaran menentukan mana sisi luar
+    var luas2 = 0, i;
+    for (i = 0; i < n; i++) {
+      var a = pointsM[i], b = pointsM[(i + 1) % n];
+      luas2 += a[0] * b[1] - b[0] * a[1];
+    }
+    var arah = luas2 >= 0 ? 1 : -1;
+
+    // garis tiap sisi setelah digeser keluar: titik awal + arah
+    var garis = [];
+    for (i = 0; i < n; i++) {
+      var p = pointsM[i], q = pointsM[(i + 1) % n];
+      var dx = q[0] - p[0], dy = q[1] - p[1];
+      var len = Math.hypot(dx, dy);
+      if (len < 1e-12) return pointsM;            // titik kembar: jangan diutak-atik
+      var nx = (dy / len) * arah, ny = (-dx / len) * arah;
+      garis.push({
+        x: p[0] + nx * marginM, y: p[1] + ny * marginM,
+        dx: dx / len, dy: dy / len
+      });
+    }
+
+    var out = [];
+    for (i = 0; i < n; i++) {
+      var g1 = garis[(i - 1 + n) % n], g2 = garis[i];
+      var det = g1.dx * (-g2.dy) - g1.dy * (-g2.dx);
+      if (Math.abs(det) < 1e-9) {
+        // dua sisi hampir sejajar: pakai ujung sisi yang sudah digeser
+        out.push([g2.x, g2.y]);
+        continue;
+      }
+      var rx = g2.x - g1.x, ry = g2.y - g1.y;
+      var t = (rx * (-g2.dy) - ry * (-g2.dx)) / det;
+      out.push([g1.x + g1.dx * t, g1.y + g1.dy * t]);
+    }
+
+    // hasil yang memotong dirinya sendiri lebih buruk daripada tanpa margin
+    for (i = 0; i < n; i++) {
+      for (var j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;      // sisi yang bersebelahan
+        if (segmenBersilang(out[i], out[(i + 1) % n], out[j], out[(j + 1) % n])) {
+          return pointsM;
+        }
+      }
+    }
+    return out;
+  }
+
+  function segmenBersilang(a, b, c, d) {
+    var sisi = function (p, q, r) {
+      return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    };
+    var d1 = sisi(a, b, c), d2 = sisi(a, b, d);
+    var d3 = sisi(c, d, a), d4 = sisi(c, d, b);
+    return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+  }
+
+
   global.Geometry3D = {
+    basePlate: basePlate,
+    growPolygon: growPolygon,
     build: build,
     mergeGeos: mergeGeos,
     fromTriangles: fromTriangles,

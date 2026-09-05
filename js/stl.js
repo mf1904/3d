@@ -123,7 +123,7 @@
 
   /**
    * @param objects  array Object3D (mesh / group)
-   * @param opts     { filename, printScale (1:N), binary, title }
+   * @param opts     { filename, printScale (1:N), binary, title, zeroBase }
    * @returns { triangles, size:{x,y,z} }  ukuran hasil dalam mm
    */
   function exportSTL(objects, opts) {
@@ -133,6 +133,22 @@
 
     var tris = collectTriangles(objects, mmPerMeter);
     if (!tris.length) throw new Error('Tidak ada geometri untuk diexport.');
+
+    /* Alas dibangun di bawah y = 0 supaya model yang sudah ada tidak perlu
+     * digeser. Akibatnya benda jadi punya z negatif; slicer memang otomatis
+     * menjatuhkannya ke meja, tapi berkas yang mulai tepat di z = 0 lebih
+     * enak diperiksa dan tidak bikin ragu waktu dibuka. */
+    if (opts.zeroBase) {
+      var minZ = Infinity;
+      for (var q = 0; q < tris.length; q++) {
+        for (var w = 0; w < 3; w++) if (tris[q][w][2] < minZ) minZ = tris[q][w][2];
+      }
+      if (minZ !== 0 && isFinite(minZ)) {
+        for (q = 0; q < tris.length; q++) {
+          for (w = 0; w < 3; w++) tris[q][w][2] -= minZ;
+        }
+      }
+    }
 
     var title = opts.title || 'layout3d';
     var blob = opts.binary === false ? toAscii(tris, title) : toBinary(tris, title);

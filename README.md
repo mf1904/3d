@@ -880,3 +880,57 @@ Halaman cetak memakai `print-color-adjust: exact`. Tanpa itu sebagian peramban
 
 Setelah memotret, ukuran kanvas, zoom, posisi pandang, seleksi, dan kamera 3D
 dikembalikan persis seperti sebelumnya.
+
+---
+
+## Alas cetak 3D (base plate)
+
+Tombol **STL Semua** / **STL Terpilih** membuka dialog export: skala cetak,
+alas, dan **ukuran hasil cetak yang dihitung langsung** sambil pilihannya
+diubah.
+
+Ukuran itu ditaruh di depan karena untuk cetak 3D pertanyaan pertamanya selalu
+"muat tidak di meja printer saya" — dan jawabannya tergantung skala yang belum
+dipilih. Sebelumnya ukuran baru diberitahu *setelah* berkasnya jadi.
+
+### Kenapa perlu alas
+
+Tanpa alas, tiap bangunan keluar sebagai potongan lepas yang harus ditempel
+sendiri, dan bagian tipis (pohon, tiang, cerobong) gampang lepas dari meja
+printer. Alas menyatukan semuanya dalam satu berkas STL.
+
+### Pilihan
+
+| | |
+|---|---|
+| **Tanpa alas** | seperti sebelumnya — hanya massa bangunan |
+| **Kotak** | pelat persegi panjang di bawah seluruh model |
+| **Ikut bentuk tanah** | pelat mengikuti poligon tanah (perlu tepat 1 bidang tanah) |
+
+**Tebal** dan **margin** diisi dalam **milimeter benda jadi**, bukan meter di
+denah — jadi angkanya tidak ikut berubah waktu skala diganti. Tebal 2 mm tetap
+2 mm baik di 1:100 maupun 1:500.
+
+### Dua hal yang perlu diketahui
+
+**Alas kotak ikut batas tanah saat mencetak seluruh scene.** Bidang tanah tidak
+ikut export STL — ia layer acuan, bukan massa. Kalau kotak alas hanya mengikuti
+bangunan, mencetak seluruh site menghasilkan alas yang memotong tapaknya,
+padahal alas justru mewakili tanahnya. Jadi saat seluruh scene dicetak, batas
+tanah ikut diperhitungkan; saat hanya seleksi yang dicetak, alas merapat ke
+benda yang dipilih.
+
+**Margin adalah offset sisi yang sebenarnya, bukan penskalaan.** Tiap sisi
+digeser sejauh margin searah normal luarnya, lalu sudutnya dicari dari
+perpotongan sisi-sisi baru. Menskala poligon menjauhi titik beratnya jauh lebih
+murah tapi meleset: pada tanah 80 × 60 m, margin 3 mm jadi 2,4 mm di satu sumbu
+dan 1,8 mm di sumbu lain. Kalau offset-nya membuat poligon memotong dirinya
+sendiri (sudut dalam yang sangat sempit), bentuk aslinya dikembalikan apa
+adanya — alas pas-pasan lebih baik daripada alas simpul.
+
+Permukaan atas alas tepat di ketinggian 0, jadi bangunan yang sudah ada duduk
+di atasnya tanpa digeser. Berkas STL-nya dinaikkan supaya mulai tepat di z = 0.
+
+Alasnya watertight untuk bentuk tanah persegi, cembung, maupun berlekuk seperti
+huruf L. Pilihan terakhir diingat untuk export berikutnya — tapi hanya kalau
+benar-benar diexport, bukan saat dibatalkan.

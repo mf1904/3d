@@ -1441,10 +1441,10 @@
     bindSplitter();
     bindRSplitter();
 
-    $('btn-stl-all').onclick = function () { doExportSTL(null); };
+    $('btn-stl-all').onclick = function () { ExportSTL.dialog(null); };
     $('btn-stl-sel').onclick = function () {
       if (!Project.selection.length) { say('Pilih dulu objek yang mau diexport.', 'warn'); return; }
-      doExportSTL(Project.selection);
+      ExportSTL.dialog(Project.selection);
     };
 
     $('modal-backdrop').addEventListener('mousedown', function (e) {
@@ -1577,27 +1577,6 @@
     return (n || 'layout3d').replace(/[^a-zA-Z0-9_\-]+/g, '_').replace(/^_+|_+$/g, '') || 'layout3d';
   }
 
-  function doExportSTL(ids) {
-    var objs = Viewer3D.exportables(ids);
-    if (!objs.length) {
-      say('Tidak ada objek solid untuk diexport (cek centang "Sertakan di export STL").', 'warn');
-      return;
-    }
-    var ps = parseFloat($('print-scale').value) || 1;
-    try {
-      var r = STL.exportSTL(objs, {
-        printScale: ps,
-        filename: safeName(Project.state.name) + (ids ? '_terpilih' : '') + '_1-' + ps + '.stl',
-        title: Project.state.name
-      });
-      say('STL: ' + objs.length + ' objek, ' + r.triangles.toLocaleString('id-ID') + ' segitiga, ' +
-          'ukuran cetak ' + fmtMm(r.size.x) + ' × ' + fmtMm(r.size.y) + ' × ' + fmtMm(r.size.z) + ' mm.');
-    } catch (e) {
-      say('Export STL gagal: ' + e.message, 'err');
-    }
-  }
-
-  function fmtMm(v) { return (Math.round(v * 10) / 10).toString(); }
 
   /* ------------------------------------------------------------------ */
   /* shortcut keyboard                                                  */
